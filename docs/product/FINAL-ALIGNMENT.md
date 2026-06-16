@@ -12,9 +12,9 @@
 需求基准：
 
 1. [产品需求文档](./PRD.md)
-2. [高保真 UI](./design/high-fidelity/)
-3. [UI 设计规范](./design/high-fidelity/UI-DESIGN.md)
-4. [技术方案](./TECHNICAL-SOLUTION.md)
+2. [高保真 UI](../design/high-fidelity/)
+3. [UI 设计规范](../design/high-fidelity/UI-DESIGN.md)
+4. [技术方案](../technical/TECHNICAL-SOLUTION.md)
 
 发生理解冲突时，先以 PRD 的功能规则为准；视觉细节以已确认高保真 UI 和 UI 设计规范为准；数据与工程实现以技术方案为准。
 

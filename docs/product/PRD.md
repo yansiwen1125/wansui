@@ -97,11 +97,11 @@ App 包含两个一级页面：
 
 ### 4.2 高保真 UI
 
-- [登录页 UI](./design/high-fidelity/万岁-登录页UI.svg)
-- [首页 UI](./design/high-fidelity/万岁-首页UI.svg)
-- [月历 UI](./design/high-fidelity/万岁-月历UI.svg)
-- [任务记录 UI](./design/high-fidelity/万岁-任务记录UI.svg)
-- [UI 设计规范](./design/high-fidelity/UI-DESIGN.md)
+- [登录页 UI](../design/high-fidelity/万岁-登录页UI.svg)
+- [首页 UI](../design/high-fidelity/万岁-首页UI.svg)
+- [月历 UI](../design/high-fidelity/万岁-月历UI.svg)
+- [任务记录 UI](../design/high-fidelity/万岁-任务记录UI.svg)
+- [UI 设计规范](../design/high-fidelity/UI-DESIGN.md)
 
 ## 5. 通用规则
 
@@ -172,7 +172,7 @@ App 包含两个一级页面：
 
 ### 6.2 线框图
 
-![首页低保真](./design/low-fidelity/万岁-首页低保真.svg)
+![首页低保真](../design/low-fidelity/万岁-首页低保真.svg)
 
 ### 6.3 页面结构
 
@@ -261,7 +261,7 @@ Tab 规则：
 
 ### 8.2 线框图
 
-![月历低保真](./design/low-fidelity/万岁-记录页-按月份低保真.svg)
+![月历低保真](../design/low-fidelity/万岁-记录页-按月份低保真.svg)
 
 ### 8.3 页面结构
 
@@ -324,7 +324,7 @@ Tab 规则：
 
 ### 9.2 线框图
 
-![任务记录低保真](./design/low-fidelity/万岁-记录页-任务低保真.svg)
+![任务记录低保真](../design/low-fidelity/万岁-记录页-任务低保真.svg)
 
 ### 9.3 页面结构
 

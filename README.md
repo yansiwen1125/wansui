@@ -2,6 +2,22 @@
 
 万岁 V1.0 是一个面向 iPhone Safari 的响应式 PWA 打卡应用。
 
+## 目录结构
+
+```text
+.
+├── docs/              产品、设计、技术和团队文档
+├── icons/             App 图标
+├── scripts/           构建、图标生成和本地预览脚本
+├── src/               App 源码
+├── supabase/          云端数据库 SQL
+├── test/              自动测试
+├── index.html         App 入口
+├── config.js          Supabase 云端配置
+├── manifest.webmanifest
+└── sw.js              PWA 离线缓存
+```
+
 ## 本地运行
 
 ```bash
@@ -28,6 +44,8 @@ node scripts/build.mjs
 ## 发布
 
 项目已包含 GitHub Pages 自动发布配置。完整步骤见
-[`DEPLOYMENT.md`](./DEPLOYMENT.md)。
+[`docs/technical/DEPLOYMENT.md`](./docs/technical/DEPLOYMENT.md)。
 
 未配置 Supabase 时，应用会自动使用本机存储；配置后会将打卡记录同步到云端。
+
+更多文档见 [`docs/README.md`](./docs/README.md)。

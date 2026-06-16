@@ -13,11 +13,11 @@ if [ ! -d "$TARGET_DIR/.git" ]; then
   exit 1
 fi
 
-rsync -av \
+rsync -av --delete \
   --exclude ".git" \
   --exclude "dist" \
   --exclude ".DS_Store" \
-  --exclude "design/.DS_Store" \
+  --exclude "docs/design/.DS_Store" \
   "$SOURCE_DIR/" "$TARGET_DIR/"
 
 cd "$TARGET_DIR"
