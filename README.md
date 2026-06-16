@@ -1,26 +1,24 @@
 # 万岁
 
-万岁 V1.0 是一个面向 iPhone Safari 的响应式 PWA 打卡应用。
+万岁是一个面向 iPhone Safari 的响应式 PWA 打卡应用。
 
 ## 目录结构
 
 ```text
 .
-├── docs/              产品、设计、技术和团队文档
-├── icons/             App 图标
-├── scripts/           构建、图标生成和本地预览脚本
-├── src/               App 源码
-├── supabase/          云端数据库 SQL
-├── test/              自动测试
-├── index.html         App 入口
-├── config.js          Supabase 云端配置
-├── manifest.webmanifest
-└── sw.js              PWA 离线缓存
+├── app/               当前正式版本的实现代码
+├── docs/              本地保留的版本文档
+├── 发布工具/          一键发布脚本和历史脚本
+├── .github/           GitHub Pages 自动发布
+└── README.md          项目入口说明
 ```
 
-## 本地运行
+## App 代码
+
+实际实现代码都在 [`app/`](./app/)。
 
 ```bash
+cd app
 node scripts/server.mjs
 ```
 
@@ -29,23 +27,34 @@ node scripts/server.mjs
 ## 测试与构建
 
 ```bash
+cd app
 node --test
 node scripts/build.mjs
 ```
 
 ## Supabase
 
-1. 在 Supabase SQL Editor 执行 [`supabase/schema.sql`](./supabase/schema.sql)。
-2. 将 `config.js` 中的 `supabaseUrl` 和 `supabasePublishableKey` 填入。
+1. 在 Supabase SQL Editor 执行 [`app/supabase/schema.sql`](./app/supabase/schema.sql)。
+2. 将 `app/config.js` 中的 `supabaseUrl` 和 `supabasePublishableKey` 填入。
 3. 未配置 Supabase 时，应用使用本机 IndexedDB 模式，方便先预览与验收 UI。
 
 固定用户名为 `ysw`，固定生效日期为 `2026-06-10`。
 
 ## 发布
 
-项目已包含 GitHub Pages 自动发布配置。完整步骤见
-[`docs/technical/DEPLOYMENT.md`](./docs/technical/DEPLOYMENT.md)。
+正式发布只用这个脚本：
 
-未配置 Supabase 时，应用会自动使用本机存储；配置后会将打卡记录同步到云端。
+- [`发布工具/同步正式版到GitHub.command`](./发布工具/同步正式版到GitHub.command)
 
-更多文档见 [`docs/README.md`](./docs/README.md)。
+GitHub 只同步正式版需要的内容：
+
+- `.github/`
+- `.gitignore`
+- `README.md`
+- `app/`
+
+文档、设计稿、历史脚本只保留在本地，不再一起堆到 GitHub。
+
+每个正式版本通过 GitHub 的 `main + tag` 保留，比如 `v1.1`。
+
+更多说明见 [`发布工具/README.md`](./发布工具/README.md) 和 [`docs/README.md`](./docs/README.md)。

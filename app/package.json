@@ -1,0 +1,13 @@
+{
+  "name": "wansui",
+  "private": true,
+  "version": "1.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "node scripts/server.mjs",
+    "icons": "node scripts/generate-icons.mjs",
+    "build": "node scripts/build.mjs",
+    "preview": "node scripts/server.mjs dist",
+    "test": "node --test"
+  }
+}

@@ -35,12 +35,15 @@ jobs:
 
       - name: Create cloud config
         if: ${{ env.SUPABASE_URL != '' && env.SUPABASE_PUBLISHABLE_KEY != '' }}
+        working-directory: app
         run: node scripts/write-config.mjs
 
       - name: Test
+        working-directory: app
         run: node --test
 
       - name: Build
+        working-directory: app
         run: node scripts/build.mjs
 
       - name: Configure Pages
@@ -49,7 +52,7 @@ jobs:
       - name: Upload site
         uses: actions/upload-pages-artifact@v3
         with:
-          path: dist
+          path: app/dist
 
       - name: Deploy
         id: deployment
