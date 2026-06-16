@@ -348,13 +348,13 @@ async function syncFromCloud() {
   render();
   if (!navigator.onLine || !cloudEnabled()) return;
   try {
-    await initializeCloud();
     const cloud = await fetchRecords();
     if (cloud) {
       loadRecordArray(cloud);
       await saveCache(recordArray());
       render();
     }
+    initializeCloud().catch(() => {});
   } catch (error) {
     showMessage(`${error.message || "云端连接失败"}，正在显示缓存`);
   }

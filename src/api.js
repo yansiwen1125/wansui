@@ -2,20 +2,22 @@ import { EFFECTIVE_START_DATE } from "./domain.js";
 
 const config = window.WANSUI_CONFIG ?? {};
 const enabled = Boolean(config.supabaseUrl && config.supabasePublishableKey);
+const baseUrl = (config.supabaseUrl || "").replace(/\/rest\/v1\/?$/, "").replace(/\/+$/, "");
 
-function headers(extra = {}) {
-  return {
+function headers(extra = {}, hasBody = false) {
+  const result = {
     apikey: config.supabasePublishableKey,
     Authorization: `Bearer ${config.supabasePublishableKey}`,
-    "Content-Type": "application/json",
     ...extra
   };
+  if (hasBody) result["Content-Type"] = "application/json";
+  return result;
 }
 
 async function request(path, options = {}) {
-  const response = await fetch(`${config.supabaseUrl}/rest/v1/${path}`, {
+  const response = await fetch(`${baseUrl}/rest/v1/${path}`, {
     ...options,
-    headers: headers(options.headers)
+    headers: headers(options.headers, Boolean(options.body))
   });
   if (!response.ok) {
     let detail = "";
@@ -58,7 +60,7 @@ export async function fetchRecords() {
 
 export async function saveRecord(taskId, date, completed) {
   if (!enabled) return { task_id: taskId, date, completed, updated_at: new Date().toISOString() };
-  const result = await request("checkins?on_conflict=task_id,date", {
+  const result = await request("checkins?on_conflict=task_id%2Cdate", {
     method: "POST",
     headers: { Prefer: "resolution=merge-duplicates,return=representation" },
     body: JSON.stringify({ task_id: taskId, date, completed })
