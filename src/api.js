@@ -31,7 +31,8 @@ async function request(path, options = {}) {
     throw new Error(`云端请求失败（${response.status}）${suffix}`);
   }
   if (response.status === 204) return null;
-  return response.json();
+  const text = await response.text();
+  return text ? JSON.parse(text) : null;
 }
 
 export function cloudEnabled() {
@@ -40,9 +41,10 @@ export function cloudEnabled() {
 
 export async function initializeCloud() {
   if (!enabled) return;
-  await request("app_config?on_conflict=id", {
+  const existing = await request("app_config?id=eq.1&select=id");
+  if (existing.length) return;
+  await request("app_config", {
     method: "POST",
-    headers: { Prefer: "resolution=ignore-duplicates,return=minimal" },
     body: JSON.stringify({
       id: 1,
       username: "ysw",
@@ -60,10 +62,22 @@ export async function fetchRecords() {
 
 export async function saveRecord(taskId, date, completed) {
   if (!enabled) return { task_id: taskId, date, completed, updated_at: new Date().toISOString() };
-  const result = await request("checkins?on_conflict=task_id%2Cdate", {
+  const existing = await request(
+    `checkins?task_id=eq.${encodeURIComponent(taskId)}&date=eq.${encodeURIComponent(date)}&select=task_id,date`
+  );
+  if (existing.length) {
+    await request(
+      `checkins?task_id=eq.${encodeURIComponent(taskId)}&date=eq.${encodeURIComponent(date)}`,
+      {
+        method: "PATCH",
+        body: JSON.stringify({ completed })
+      }
+    );
+    return { task_id: taskId, date, completed, updated_at: new Date().toISOString() };
+  }
+  const result = await request("checkins", {
     method: "POST",
-    headers: { Prefer: "resolution=merge-duplicates,return=representation" },
     body: JSON.stringify({ task_id: taskId, date, completed })
   });
-  return result[0];
+  return result?.[0] || { task_id: taskId, date, completed, updated_at: new Date().toISOString() };
 }
