@@ -31,6 +31,7 @@ jobs:
           node-version: 22
 
       - name: Create cloud config
+        if: ${{ secrets.SUPABASE_URL != '' && secrets.SUPABASE_PUBLISHABLE_KEY != '' }}
         env:
           SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
           SUPABASE_PUBLISHABLE_KEY: ${{ secrets.SUPABASE_PUBLISHABLE_KEY }}

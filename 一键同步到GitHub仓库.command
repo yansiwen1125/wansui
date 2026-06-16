@@ -42,6 +42,11 @@ else
   echo "已提交到本地 Git 仓库。"
 fi
 
+if git remote get-url origin >/dev/null 2>&1; then
+  git push origin main
+  echo "已推送到 GitHub。"
+fi
+
 echo ""
-echo "完成。现在回到 GitHub Desktop，点击 Publish repository。"
+echo "完成。现在可以去 GitHub 查看 Pages 发布状态。"
 read -k 1 "?按任意键退出"
