@@ -355,8 +355,8 @@ async function syncFromCloud() {
       await saveCache(recordArray());
       render();
     }
-  } catch {
-    showMessage("云端连接失败，正在显示缓存");
+  } catch (error) {
+    showMessage(`${error.message || "云端连接失败"}，正在显示缓存`);
   }
 }
 

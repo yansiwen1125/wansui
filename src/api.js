@@ -17,7 +17,17 @@ async function request(path, options = {}) {
     ...options,
     headers: headers(options.headers)
   });
-  if (!response.ok) throw new Error(`云端请求失败（${response.status}）`);
+  if (!response.ok) {
+    let detail = "";
+    try {
+      const body = await response.json();
+      detail = body.message || body.hint || body.details || "";
+    } catch {
+      detail = await response.text().catch(() => "");
+    }
+    const suffix = detail ? `：${detail}` : "";
+    throw new Error(`云端请求失败（${response.status}）${suffix}`);
+  }
   if (response.status === 204) return null;
   return response.json();
 }
