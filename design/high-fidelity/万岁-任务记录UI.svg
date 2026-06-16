@@ -1,0 +1,86 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="520" height="980" viewBox="0 0 520 980">
+  <defs>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="180%">
+      <feDropShadow dx="0" dy="12" stdDeviation="18" flood-color="#534B3F" flood-opacity=".10"/>
+    </filter>
+    <g id="dots">
+      <g fill="#E2E0DB">
+        <circle cx="0" cy="0" r="5"/><circle cx="15" cy="0" r="5"/><circle cx="30" cy="0" r="5"/><circle cx="45" cy="0" r="5"/><circle cx="60" cy="0" r="5"/><circle cx="75" cy="0" r="5"/><circle cx="90" cy="0" r="5"/>
+        <circle cx="0" cy="15" r="5"/><circle cx="15" cy="15" r="5"/><circle cx="30" cy="15" r="5"/><circle cx="45" cy="15" r="5"/><circle cx="60" cy="15" r="5"/><circle cx="75" cy="15" r="5"/><circle cx="90" cy="15" r="5"/>
+        <circle cx="0" cy="30" r="5"/><circle cx="15" cy="30" r="5"/><circle cx="30" cy="30" r="5"/><circle cx="45" cy="30" r="5"/><circle cx="60" cy="30" r="5"/><circle cx="75" cy="30" r="5"/><circle cx="90" cy="30" r="5"/>
+        <circle cx="0" cy="45" r="5"/><circle cx="15" cy="45" r="5"/><circle cx="30" cy="45" r="5"/><circle cx="45" cy="45" r="5"/><circle cx="60" cy="45" r="5"/><circle cx="75" cy="45" r="5"/><circle cx="90" cy="45" r="5"/>
+        <circle cx="0" cy="60" r="5"/><circle cx="15" cy="60" r="5"/><circle cx="30" cy="60" r="5"/><circle cx="45" cy="60" r="5"/><circle cx="60" cy="60" r="5"/><circle cx="75" cy="60" r="5"/><circle cx="90" cy="60" r="5"/>
+        <circle cx="0" cy="75" r="5"/><circle cx="15" cy="75" r="5"/><circle cx="30" cy="75" r="5"/><circle cx="45" cy="75" r="5"/><circle cx="60" cy="75" r="5"/><circle cx="75" cy="75" r="5"/><circle cx="90" cy="75" r="5"/>
+      </g>
+    </g>
+  </defs>
+
+  <rect width="520" height="980" fill="#EDEAE3"/>
+  <rect x="65" y="38" width="390" height="844" rx="52" fill="#FAF9F6" filter="url(#shadow)"/>
+  <rect x="196" y="54" width="128" height="28" rx="14" fill="#252522"/>
+
+  <g font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif">
+    <!-- Tabs -->
+    <text x="89" y="143" font-size="20" font-weight="500" fill="#AAA8A1">月历</text>
+    <text x="147" y="143" font-size="32" font-weight="750" fill="#252522">任务</text>
+
+    <!-- Overview -->
+    <text x="89" y="194" font-size="18" font-weight="700" fill="#252522">本月总览</text>
+    <g transform="translate(89 214)">
+      <rect width="342" height="104" rx="24" fill="#FFFFFF"/>
+      <line x1="114" y1="20" x2="114" y2="84" stroke="#E8E5DE"/>
+      <line x1="228" y1="20" x2="228" y2="84" stroke="#E8E5DE"/>
+      <g text-anchor="middle">
+        <text x="57" y="34" font-size="12" fill="#77756F">绿灯天数</text><text x="57" y="71" font-size="28" font-weight="750" fill="#252522">7</text>
+        <text x="171" y="34" font-size="12" fill="#77756F">总完成率</text><text x="171" y="71" font-size="28" font-weight="750" fill="#252522">62%</text>
+        <text x="285" y="34" font-size="12" fill="#77756F">总打卡</text><text x="285" y="71" font-size="28" font-weight="750" fill="#252522">28</text>
+      </g>
+    </g>
+
+    <!-- Task block: top divider y=346, bottom divider y=714, equal 28px outer spacing -->
+    <line x1="89" y1="346" x2="431" y2="346" stroke="#E8E5DE"/>
+    <g transform="translate(89 374)">
+      <rect width="16" height="40" rx="8" fill="#A9795B"/>
+      <text x="32" y="28" font-size="24" font-weight="750" fill="#252522">拉屎</text>
+      <text x="342" y="25" text-anchor="end" font-size="14" font-weight="600" fill="#77756F">2026</text>
+
+      <g transform="translate(0 76)">
+        <text x="45" y="0" text-anchor="middle" font-size="14" font-weight="650" fill="#77756F">4月</text>
+        <text x="171" y="0" text-anchor="middle" font-size="14" font-weight="650" fill="#77756F">5月</text>
+        <text x="297" y="0" text-anchor="middle" font-size="14" font-weight="650" fill="#77756F">6月</text>
+        <use href="#dots" x="0" y="22"/><use href="#dots" x="126" y="22"/><use href="#dots" x="252" y="22"/>
+        <g fill="#A9795B">
+          <circle cx="45" cy="22" r="5"/><circle cx="75" cy="22" r="5"/><circle cx="0" cy="37" r="5"/><circle cx="30" cy="37" r="5"/><circle cx="60" cy="37" r="5"/><circle cx="90" cy="37" r="5"/>
+          <circle cx="15" cy="52" r="5"/><circle cx="45" cy="52" r="5"/><circle cx="75" cy="52" r="5"/><circle cx="0" cy="67" r="5"/><circle cx="30" cy="67" r="5"/><circle cx="60" cy="67" r="5"/>
+          <circle cx="186" cy="22" r="5"/><circle cx="216" cy="22" r="5"/><circle cx="126" cy="37" r="5"/><circle cx="156" cy="37" r="5"/><circle cx="186" cy="37" r="5"/><circle cx="216" cy="37" r="5"/>
+          <circle cx="267" cy="22" r="5"/><circle cx="297" cy="22" r="5"/><circle cx="327" cy="22" r="5"/><circle cx="252" cy="37" r="5"/><circle cx="282" cy="37" r="5"/><circle cx="312" cy="37" r="5"/>
+        </g>
+        <circle cx="312" cy="37" r="9" fill="none" stroke="#252522" stroke-width="1.7"/>
+      </g>
+
+      <g transform="translate(0 236)" text-anchor="middle">
+        <text x="43" y="0" font-size="11" fill="#77756F">本月打卡率</text><text x="43" y="34" font-size="25" font-weight="750" fill="#252522">82%</text>
+        <text x="128" y="0" font-size="11" fill="#77756F">本月次数</text><text x="128" y="34" font-size="25" font-weight="750" fill="#252522">9</text>
+        <text x="214" y="0" font-size="11" fill="#77756F">当前连续</text><text x="214" y="34" font-size="25" font-weight="750" fill="#252522">4天</text>
+        <text x="299" y="0" font-size="11" fill="#77756F">最长连续</text><text x="299" y="34" font-size="25" font-weight="750" fill="#252522">12天</text>
+      </g>
+    </g>
+    <line x1="89" y1="714" x2="431" y2="714" stroke="#E8E5DE"/>
+    <text x="260" y="747" text-anchor="middle" font-size="12" fill="#AAA8A1">向下滑动查看其他任务</text>
+
+    <!-- Bottom navigation -->
+    <g transform="translate(65 785)">
+      <path d="M0 0h390v45q0 52-52 52H52Q0 97 0 45z" fill="#FFFFFF" fill-opacity=".94"/>
+      <line x1="24" y1="0" x2="366" y2="0" stroke="#E8E5DE"/>
+      <g transform="translate(112 18)">
+        <path d="M-10 7l10-9 10 9v12H3v-8h-6v8h-7z" fill="none" stroke="#AAA8A1" stroke-width="1.8"/>
+        <text y="42" text-anchor="middle" font-size="11" fill="#AAA8A1">首页</text>
+      </g>
+      <g transform="translate(278 18)">
+        <rect x="-10" y="-2" width="20" height="20" rx="5" fill="#252522"/>
+        <path d="M-5 4h10M-5 9h10M-5 14h7" stroke="#FFFFFF" stroke-width="1.6" stroke-linecap="round"/>
+        <text y="42" text-anchor="middle" font-size="11" font-weight="650" fill="#252522">记录</text>
+      </g>
+    </g>
+  </g>
+</svg>

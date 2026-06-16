@@ -1,0 +1,153 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1000" height="1900" viewBox="0 0 1000 1900">
+  <rect width="1000" height="1900" fill="#f2f2f2"/>
+  <text x="60" y="72" font-family="Arial, PingFang SC, sans-serif" font-size="30" font-weight="700" fill="#222">万岁 App · 任务记录低保真</text>
+  <text x="60" y="112" font-family="Arial, PingFang SC, sans-serif" font-size="19" fill="#777">统一七列｜自然周对齐｜任务之间分割</text>
+
+  <rect x="160" y="145" width="580" height="1660" rx="44" fill="#fff" stroke="#222" stroke-width="3"/>
+  <rect x="380" y="162" width="140" height="18" rx="9" fill="#222"/>
+
+  <!-- Tabs -->
+  <text x="200" y="257" font-family="Arial, PingFang SC, sans-serif" font-size="21" font-weight="400" fill="#aaa">月历</text>
+  <text x="287" y="257" font-family="Arial, PingFang SC, sans-serif" font-size="32" font-weight="700" fill="#222">任务</text>
+
+  <!-- Overview -->
+  <text x="195" y="310" font-family="Arial, PingFang SC, sans-serif" font-size="25" font-weight="700" fill="#333">本月总览</text>
+  <g font-family="Arial, PingFang SC, sans-serif" text-anchor="middle">
+    <text x="280" y="365" font-size="16" fill="#999">绿灯天数</text><text x="280" y="410" font-size="35" font-weight="700" fill="#333">7</text>
+    <text x="450" y="365" font-size="16" fill="#999">总完成率</text><text x="450" y="410" font-size="35" font-weight="700" fill="#333">62%</text>
+    <text x="620" y="365" font-size="16" fill="#999">总打卡</text><text x="620" y="410" font-size="35" font-weight="700" fill="#333">28</text>
+  </g>
+  <line x1="190" y1="455" x2="710" y2="455" stroke="#e5e5e5" stroke-width="2"/>
+
+  <defs>
+    <!-- One strict 7-column x 6-row matrix. x spacing 19, y spacing 19. -->
+    <g id="dot-matrix" fill="#e2e2e2">
+      <circle cx="0" cy="0" r="7"/><circle cx="19" cy="0" r="7"/><circle cx="38" cy="0" r="7"/><circle cx="57" cy="0" r="7"/><circle cx="76" cy="0" r="7"/><circle cx="95" cy="0" r="7"/><circle cx="114" cy="0" r="7"/>
+      <circle cx="0" cy="19" r="7"/><circle cx="19" cy="19" r="7"/><circle cx="38" cy="19" r="7"/><circle cx="57" cy="19" r="7"/><circle cx="76" cy="19" r="7"/><circle cx="95" cy="19" r="7"/><circle cx="114" cy="19" r="7"/>
+      <circle cx="0" cy="38" r="7"/><circle cx="19" cy="38" r="7"/><circle cx="38" cy="38" r="7"/><circle cx="57" cy="38" r="7"/><circle cx="76" cy="38" r="7"/><circle cx="95" cy="38" r="7"/><circle cx="114" cy="38" r="7"/>
+      <circle cx="0" cy="57" r="7"/><circle cx="19" cy="57" r="7"/><circle cx="38" cy="57" r="7"/><circle cx="57" cy="57" r="7"/><circle cx="76" cy="57" r="7"/><circle cx="95" cy="57" r="7"/><circle cx="114" cy="57" r="7"/>
+      <circle cx="0" cy="76" r="7"/><circle cx="19" cy="76" r="7"/><circle cx="38" cy="76" r="7"/><circle cx="57" cy="76" r="7"/><circle cx="76" cy="76" r="7"/><circle cx="95" cy="76" r="7"/><circle cx="114" cy="76" r="7"/>
+      <circle cx="0" cy="95" r="7"/><circle cx="19" cy="95" r="7"/><circle cx="38" cy="95" r="7"/><circle cx="57" cy="95" r="7"/><circle cx="76" cy="95" r="7"/><circle cx="95" cy="95" r="7"/><circle cx="114" cy="95" r="7"/>
+    </g>
+    <circle id="dot-light" cx="0" cy="0" r="7" fill="#f2f2f2"/>
+  </defs>
+
+  <!-- TASK 1 -->
+  <rect x="190" y="492" width="36" height="36" rx="7" fill="#a9795b"/>
+  <text x="248" y="521" font-family="Arial, PingFang SC, sans-serif" font-size="31" font-weight="700" fill="#222">拉屎</text>
+  <text x="710" y="520" text-anchor="end" font-family="Arial, PingFang SC, sans-serif" font-size="21" font-weight="600" fill="#777">2026</text>
+  <g transform="translate(-112.5 -145) scale(1.25)">
+  <g font-family="Arial, PingFang SC, sans-serif" font-size="20" font-weight="600" fill="#555" text-anchor="middle">
+    <text x="306" y="580">4月</text><text x="450" y="580">5月</text><text x="594" y="580">6月</text>
+  </g>
+
+  <!-- All three months reuse exactly the same matrix -->
+  <use href="#dot-matrix" x="249" y="610"/>
+  <use href="#dot-matrix" x="393" y="610"/>
+  <use href="#dot-matrix" x="537" y="610"/>
+
+  <!-- Non-month positions are lighter than unchecked dates -->
+  <g>
+    <!-- April: starts Wednesday, 30 days -->
+    <use href="#dot-light" x="249" y="610"/><use href="#dot-light" x="268" y="610"/><use href="#dot-light" x="287" y="610"/>
+    <use href="#dot-light" x="344" y="686"/><use href="#dot-light" x="363" y="686"/>
+    <use href="#dot-light" x="249" y="705"/><use href="#dot-light" x="268" y="705"/><use href="#dot-light" x="287" y="705"/><use href="#dot-light" x="306" y="705"/><use href="#dot-light" x="325" y="705"/><use href="#dot-light" x="344" y="705"/><use href="#dot-light" x="363" y="705"/>
+    <!-- May: starts Friday, 31 days -->
+    <use href="#dot-light" x="393" y="610"/><use href="#dot-light" x="412" y="610"/><use href="#dot-light" x="431" y="610"/><use href="#dot-light" x="450" y="610"/><use href="#dot-light" x="469" y="610"/>
+    <use href="#dot-light" x="412" y="705"/><use href="#dot-light" x="431" y="705"/><use href="#dot-light" x="450" y="705"/><use href="#dot-light" x="469" y="705"/><use href="#dot-light" x="488" y="705"/><use href="#dot-light" x="507" y="705"/>
+    <!-- June: starts Monday, 30 days -->
+    <use href="#dot-light" x="537" y="610"/>
+    <use href="#dot-light" x="594" y="686"/><use href="#dot-light" x="613" y="686"/><use href="#dot-light" x="632" y="686"/><use href="#dot-light" x="651" y="686"/>
+    <use href="#dot-light" x="537" y="705"/><use href="#dot-light" x="556" y="705"/><use href="#dot-light" x="575" y="705"/><use href="#dot-light" x="594" y="705"/><use href="#dot-light" x="613" y="705"/><use href="#dot-light" x="632" y="705"/><use href="#dot-light" x="651" y="705"/>
+  </g>
+
+  <!-- Brown states replace fixed gray positions -->
+  <g fill="#a9795b">
+    <!-- April -->
+    <circle cx="306" cy="610" r="7"/><circle cx="344" cy="610" r="7"/><circle cx="363" cy="610" r="7"/>
+    <circle cx="249" cy="629" r="7"/><circle cx="287" cy="629" r="7"/><circle cx="325" cy="629" r="7"/><circle cx="363" cy="629" r="7"/>
+    <circle cx="268" cy="648" r="7"/><circle cx="306" cy="648" r="7"/><circle cx="344" cy="648" r="7"/>
+    <circle cx="249" cy="667" r="7"/><circle cx="287" cy="667" r="7"/><circle cx="325" cy="667" r="7"/><circle cx="363" cy="667" r="7"/>
+    <circle cx="268" cy="686" r="7"/><circle cx="306" cy="686" r="7"/><circle cx="344" cy="686" r="7"/>
+    <!-- May -->
+    <circle cx="488" cy="610" r="7"/><circle cx="507" cy="610" r="7"/>
+    <circle cx="393" cy="629" r="7"/><circle cx="431" cy="629" r="7"/><circle cx="469" cy="629" r="7"/><circle cx="507" cy="629" r="7"/>
+    <circle cx="412" cy="648" r="7"/><circle cx="450" cy="648" r="7"/><circle cx="488" cy="648" r="7"/>
+    <circle cx="393" cy="667" r="7"/><circle cx="431" cy="667" r="7"/><circle cx="469" cy="667" r="7"/><circle cx="507" cy="667" r="7"/>
+    <circle cx="412" cy="686" r="7"/><circle cx="450" cy="686" r="7"/><circle cx="488" cy="686" r="7"/>
+    <!-- June -->
+    <circle cx="556" cy="610" r="7"/><circle cx="594" cy="610" r="7"/><circle cx="632" cy="610" r="7"/>
+    <circle cx="537" cy="629" r="7"/><circle cx="575" cy="629" r="7"/><circle cx="613" cy="629" r="7"/><circle cx="651" cy="629" r="7"/>
+    <circle cx="537" cy="648" r="7"/><circle cx="575" cy="648" r="7"/>
+  </g>
+  <circle cx="613" cy="629" r="11" fill="none" stroke="#222" stroke-width="2"/>
+  </g>
+
+  <!-- Metrics, no internal divider -->
+  <g font-family="Arial, PingFang SC, sans-serif" text-anchor="middle">
+    <text x="245" y="810" font-size="16" fill="#999">本月打卡率</text><text x="245" y="856" font-size="33" font-weight="700" fill="#333">82%</text>
+    <text x="382" y="810" font-size="16" fill="#999">本月次数</text><text x="382" y="856" font-size="33" font-weight="700" fill="#333">9</text>
+    <text x="518" y="810" font-size="16" fill="#999">当前连续</text><text x="518" y="856" font-size="33" font-weight="700" fill="#333">4天</text>
+    <text x="655" y="810" font-size="16" fill="#999">最长连续</text><text x="655" y="856" font-size="33" font-weight="700" fill="#333">12天</text>
+  </g>
+  <line x1="190" y1="910" x2="710" y2="910" stroke="#e5e5e5" stroke-width="2"/>
+
+  <!-- TASK 2 -->
+  <rect x="190" y="950" width="36" height="36" rx="7" fill="#315f8a"/>
+  <text x="248" y="979" font-family="Arial, PingFang SC, sans-serif" font-size="31" font-weight="700" fill="#222">早睡</text>
+  <text x="710" y="978" text-anchor="end" font-family="Arial, PingFang SC, sans-serif" font-size="21" font-weight="600" fill="#777">2026</text>
+  <g transform="translate(-112.5 -191.75) scale(1.25)">
+  <g font-family="Arial, PingFang SC, sans-serif" font-size="20" font-weight="600" fill="#555" text-anchor="middle">
+    <text x="306" y="993">4月</text><text x="450" y="993">5月</text><text x="594" y="993">6月</text>
+  </g>
+  <use href="#dot-matrix" x="249" y="1023"/>
+  <use href="#dot-matrix" x="393" y="1023"/>
+  <use href="#dot-matrix" x="537" y="1023"/>
+
+  <g>
+    <!-- Same calendar slots, with lighter non-month positions -->
+    <use href="#dot-light" x="249" y="1023"/><use href="#dot-light" x="268" y="1023"/><use href="#dot-light" x="287" y="1023"/>
+    <use href="#dot-light" x="344" y="1099"/><use href="#dot-light" x="363" y="1099"/>
+    <use href="#dot-light" x="249" y="1118"/><use href="#dot-light" x="268" y="1118"/><use href="#dot-light" x="287" y="1118"/><use href="#dot-light" x="306" y="1118"/><use href="#dot-light" x="325" y="1118"/><use href="#dot-light" x="344" y="1118"/><use href="#dot-light" x="363" y="1118"/>
+    <use href="#dot-light" x="393" y="1023"/><use href="#dot-light" x="412" y="1023"/><use href="#dot-light" x="431" y="1023"/><use href="#dot-light" x="450" y="1023"/><use href="#dot-light" x="469" y="1023"/>
+    <use href="#dot-light" x="412" y="1118"/><use href="#dot-light" x="431" y="1118"/><use href="#dot-light" x="450" y="1118"/><use href="#dot-light" x="469" y="1118"/><use href="#dot-light" x="488" y="1118"/><use href="#dot-light" x="507" y="1118"/>
+    <use href="#dot-light" x="537" y="1023"/>
+    <use href="#dot-light" x="594" y="1099"/><use href="#dot-light" x="613" y="1099"/><use href="#dot-light" x="632" y="1099"/><use href="#dot-light" x="651" y="1099"/>
+    <use href="#dot-light" x="537" y="1118"/><use href="#dot-light" x="556" y="1118"/><use href="#dot-light" x="575" y="1118"/><use href="#dot-light" x="594" y="1118"/><use href="#dot-light" x="613" y="1118"/><use href="#dot-light" x="632" y="1118"/><use href="#dot-light" x="651" y="1118"/>
+  </g>
+
+  <g fill="#315f8a">
+    <!-- April -->
+    <circle cx="306" cy="1023" r="7"/><circle cx="344" cy="1023" r="7"/><circle cx="268" cy="1042" r="7"/><circle cx="325" cy="1042" r="7"/>
+    <circle cx="287" cy="1061" r="7"/><circle cx="363" cy="1061" r="7"/><circle cx="306" cy="1080" r="7"/>
+    <!-- May -->
+    <circle cx="488" cy="1023" r="7"/><circle cx="412" cy="1042" r="7"/><circle cx="469" cy="1042" r="7"/><circle cx="431" cy="1061" r="7"/>
+    <circle cx="507" cy="1061" r="7"/><circle cx="450" cy="1080" r="7"/>
+    <!-- June -->
+    <circle cx="556" cy="1023" r="7"/><circle cx="613" cy="1042" r="7"/><circle cx="575" cy="1061" r="7"/>
+  </g>
+  <circle cx="613" cy="1042" r="11" fill="none" stroke="#222" stroke-width="2"/>
+  </g>
+
+  <g font-family="Arial, PingFang SC, sans-serif" text-anchor="middle">
+    <text x="245" y="1268" font-size="16" fill="#999">本月打卡率</text><text x="245" y="1314" font-size="33" font-weight="700" fill="#333">55%</text>
+    <text x="382" y="1268" font-size="16" fill="#999">本月次数</text><text x="382" y="1314" font-size="33" font-weight="700" fill="#333">6</text>
+    <text x="518" y="1268" font-size="16" fill="#999">当前连续</text><text x="518" y="1314" font-size="33" font-weight="700" fill="#333">1天</text>
+    <text x="655" y="1268" font-size="16" fill="#999">最长连续</text><text x="655" y="1314" font-size="33" font-weight="700" fill="#333">7天</text>
+  </g>
+  <line x1="190" y1="1368" x2="710" y2="1368" stroke="#e5e5e5" stroke-width="2"/>
+
+  <!-- More tasks -->
+  <rect x="190" y="1410" width="36" height="36" rx="7" fill="#82bde3"/>
+  <text x="248" y="1439" font-family="Arial, PingFang SC, sans-serif" font-size="31" font-weight="700" fill="#222">运动</text>
+  <rect x="190" y="1480" width="36" height="36" rx="7" fill="#7fb77e"/>
+  <text x="248" y="1509" font-family="Arial, PingFang SC, sans-serif" font-size="31" font-weight="700" fill="#222">饮食健康</text>
+  <text x="450" y="1580" text-anchor="middle" font-family="Arial, PingFang SC, sans-serif" font-size="19" fill="#aaa">后续任务沿用上方相同结构，页面可继续向下滑动</text>
+
+  <!-- Bottom navigation -->
+  <line x1="162" y1="1668" x2="738" y2="1668" stroke="#e4e4e4" stroke-width="2"/>
+  <circle cx="340" cy="1714" r="14" fill="none" stroke="#aaa" stroke-width="2"/>
+  <text x="340" y="1756" text-anchor="middle" font-family="Arial, PingFang SC, sans-serif" font-size="18" fill="#888">首页</text>
+  <rect x="570" y="1700" width="30" height="30" fill="#333" rx="6"/>
+  <text x="585" y="1756" text-anchor="middle" font-family="Arial, PingFang SC, sans-serif" font-size="18" font-weight="700" fill="#222">记录</text>
+</svg>

@@ -1,0 +1,105 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="520" height="980" viewBox="0 0 520 980">
+  <defs>
+    <filter id="shadow" x="-30%" y="-30%" width="160%" height="180%">
+      <feDropShadow dx="0" dy="12" stdDeviation="18" flood-color="#534B3F" flood-opacity=".10"/>
+    </filter>
+  </defs>
+  <rect width="520" height="980" fill="#EDEAE3"/>
+  <rect x="65" y="38" width="390" height="844" rx="52" fill="#FAF9F6" filter="url(#shadow)"/>
+  <rect x="196" y="54" width="128" height="28" rx="14" fill="#252522"/>
+
+  <g font-family="-apple-system, BlinkMacSystemFont, 'PingFang SC', sans-serif">
+    <text x="89" y="133" font-size="27" font-weight="750" fill="#252522">万岁</text>
+    <circle cx="390" cy="126" r="4" fill="#7FB77E"/>
+    <text x="402" y="130" font-size="11" fill="#77756F">已同步</text>
+
+    <!-- date navigation -->
+    <g transform="translate(89 164)">
+      <rect width="44" height="44" rx="14" fill="#EEEAE3"/>
+      <path d="M26 14l-9 8 9 8" fill="none" stroke="#252522" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+      <text x="171" y="29" text-anchor="middle" font-size="18" font-weight="650" fill="#252522">6月9日 · 星期二</text>
+      <rect x="298" width="44" height="44" rx="14" fill="#EEEAE3"/>
+      <path d="M316 14l9 8-9 8" fill="none" stroke="#252522" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+
+    <!-- week overview -->
+    <g transform="translate(89 232)">
+      <!-- Seven equal slots: centers 16, 67.67, 119.33, 171, 222.67, 274.33, 326 -->
+      <g transform="translate(.5 0)">
+        <rect x="3" y="3" width="11" height="11" rx="3" fill="#A9795B"/><rect x="17" y="3" width="11" height="11" rx="3" fill="#D8D6D0"/>
+        <rect x="3" y="17" width="11" height="11" rx="3" fill="#D8D6D0"/><rect x="17" y="17" width="11" height="11" rx="3" fill="#7FB77E"/>
+      </g>
+      <g transform="translate(52.17 0)">
+        <rect x="3" y="3" width="11" height="11" rx="3" fill="#A9795B"/><rect x="17" y="3" width="11" height="11" rx="3" fill="#315F8A"/>
+        <rect x="3" y="17" width="11" height="11" rx="3" fill="#D8D6D0"/><rect x="17" y="17" width="11" height="11" rx="3" fill="#D8D6D0"/>
+      </g>
+      <g transform="translate(100.33 -4)">
+        <rect width="38" height="38" rx="10" fill="#FFFFFF" stroke="#252522" stroke-width="2"/>
+        <rect x="6.5" y="6.5" width="11" height="11" rx="3" fill="#A9795B"/><rect x="20.5" y="6.5" width="11" height="11" rx="3" fill="#D8D6D0"/>
+        <rect x="6.5" y="20.5" width="11" height="11" rx="3" fill="#D8D6D0"/><rect x="20.5" y="20.5" width="11" height="11" rx="3" fill="#D8D6D0"/>
+      </g>
+      <g transform="translate(155.5 0)">
+        <rect x="3" y="3" width="11" height="11" rx="3" fill="#A9795B"/><rect x="17" y="3" width="11" height="11" rx="3" fill="#D8D6D0"/>
+        <rect x="3" y="17" width="11" height="11" rx="3" fill="#82BDE3"/><rect x="17" y="17" width="11" height="11" rx="3" fill="#7FB77E"/>
+      </g>
+      <g transform="translate(203.67 -4)">
+        <rect width="38" height="38" rx="10" fill="none" stroke="#AAA8A1" stroke-width="1.5"/>
+        <rect x="6.5" y="6.5" width="11" height="11" rx="3" fill="#A9795B"/><rect x="20.5" y="6.5" width="11" height="11" rx="3" fill="#315F8A"/>
+        <rect x="6.5" y="20.5" width="11" height="11" rx="3" fill="#D8D6D0"/><rect x="20.5" y="20.5" width="11" height="11" rx="3" fill="#D8D6D0"/>
+      </g>
+      <g transform="translate(258.83 0)">
+        <rect x="3" y="3" width="11" height="11" rx="3" fill="#ECEAE5"/><rect x="17" y="3" width="11" height="11" rx="3" fill="#ECEAE5"/>
+        <rect x="3" y="17" width="11" height="11" rx="3" fill="#ECEAE5"/><rect x="17" y="17" width="11" height="11" rx="3" fill="#ECEAE5"/>
+      </g>
+      <g transform="translate(310.5 0)">
+        <rect x="3" y="3" width="11" height="11" rx="3" fill="#ECEAE5"/><rect x="17" y="3" width="11" height="11" rx="3" fill="#ECEAE5"/>
+        <rect x="3" y="17" width="11" height="11" rx="3" fill="#ECEAE5"/><rect x="17" y="17" width="11" height="11" rx="3" fill="#ECEAE5"/>
+      </g>
+    </g>
+
+    <text x="89" y="323" font-size="28" font-weight="750" fill="#252522">我做了…</text>
+    <text x="89" y="349" font-size="13" fill="#77756F">选中的这一天，完成了 1 / 4</text>
+
+    <!-- cards -->
+    <g transform="translate(89 375)">
+      <rect width="342" height="68" rx="18" fill="#FBF6F2" stroke="#A9795B" stroke-width="1.5"/>
+      <rect x="14" y="16" width="12" height="36" rx="6" fill="#A9795B"/>
+      <text x="45" y="42" font-size="17" font-weight="650" fill="#252522">拉屎</text>
+      <circle cx="304" cy="34" r="15" fill="#A9795B"/>
+      <path d="M297 34l5 5 9-11" fill="none" stroke="#FFFFFF" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </g>
+    <g transform="translate(89 455)">
+      <rect width="342" height="68" rx="18" fill="#FFFFFF" stroke="#D8D6D0" stroke-width="1.5"/>
+      <rect x="14" y="16" width="12" height="36" rx="6" fill="#315F8A"/>
+      <text x="45" y="42" font-size="17" font-weight="650" fill="#252522">早睡</text>
+      <circle cx="304" cy="34" r="15" fill="#FFFFFF" stroke="#D8D6D0" stroke-width="2"/>
+    </g>
+    <g transform="translate(89 535)">
+      <rect width="342" height="68" rx="18" fill="#FFFFFF" stroke="#D8D6D0" stroke-width="1.5"/>
+      <rect x="14" y="16" width="12" height="36" rx="6" fill="#82BDE3"/>
+      <text x="45" y="42" font-size="17" font-weight="650" fill="#252522">运动</text>
+      <circle cx="304" cy="34" r="15" fill="#FFFFFF" stroke="#D8D6D0" stroke-width="2"/>
+    </g>
+    <g transform="translate(89 615)">
+      <rect width="342" height="68" rx="18" fill="#FFFFFF" stroke="#D8D6D0" stroke-width="1.5"/>
+      <rect x="14" y="16" width="12" height="36" rx="6" fill="#7FB77E"/>
+      <text x="45" y="42" font-size="17" font-weight="650" fill="#252522">饮食健康</text>
+      <circle cx="304" cy="34" r="15" fill="#FFFFFF" stroke="#D8D6D0" stroke-width="2"/>
+    </g>
+
+    <!-- bottom nav -->
+    <g transform="translate(65 785)">
+      <path d="M0 0h390v45q0 52-52 52H52Q0 97 0 45z" fill="#FFFFFF" fill-opacity=".92"/>
+      <line x1="24" y1="0" x2="366" y2="0" stroke="#E8E5DE"/>
+      <g transform="translate(112 18)">
+        <path d="M-10 7l10-9 10 9v12H3v-8h-6v8h-7z" fill="#252522"/>
+        <text y="42" text-anchor="middle" font-size="11" font-weight="650" fill="#252522">首页</text>
+      </g>
+      <g transform="translate(278 18)">
+        <rect x="-10" y="-2" width="20" height="20" rx="5" fill="none" stroke="#AAA8A1" stroke-width="1.8"/>
+        <path d="M-5 4h10M-5 9h10M-5 14h7" stroke="#AAA8A1" stroke-width="1.8" stroke-linecap="round"/>
+        <text y="42" text-anchor="middle" font-size="11" fill="#AAA8A1">记录</text>
+      </g>
+    </g>
+  </g>
+</svg>
