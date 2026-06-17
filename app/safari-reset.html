@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+    <meta name="theme-color" content="#edeae3">
+    <title>Safari 修复</title>
+    <style>
+      :root {
+        --page: #faf9f6;
+        --outer: #edeae3;
+        --text: #252522;
+        --muted: #77756f;
+        font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Helvetica Neue", sans-serif;
+        color: var(--text);
+        background: var(--outer);
+      }
+      * { box-sizing: border-box; }
+      html, body { margin: 0; min-height: 100%; background: var(--outer); }
+      body { display: grid; place-items: center; padding: 24px; }
+      main {
+        width: min(100%, 420px);
+        min-height: 260px;
+        border-radius: 30px;
+        background: var(--page);
+        padding: 30px 24px;
+        display: grid;
+        align-content: center;
+        gap: 14px;
+        box-shadow: 0 14px 38px rgba(83,75,63,.10);
+      }
+      h1 { margin: 0; font-size: 30px; line-height: 1.15; }
+      p { margin: 0; color: var(--muted); font-size: 15px; line-height: 1.7; }
+      a {
+        margin-top: 12px;
+        height: 54px;
+        border-radius: 18px;
+        background: var(--text);
+        color: #fff;
+        text-decoration: none;
+        display: grid;
+        place-items: center;
+        font-size: 16px;
+        font-weight: 700;
+      }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1 id="title">正在修复 Safari</h1>
+      <p id="message">正在清理这个浏览器里的旧缓存和旧本地数据。线上数据不会被删除。</p>
+      <a id="home" href="./index.html" hidden>重新打开万岁</a>
+    </main>
+    <script>
+      const title = document.querySelector("#title");
+      const message = document.querySelector("#message");
+      const home = document.querySelector("#home");
+
+      function deleteDatabase(name) {
+        return new Promise((resolve) => {
+          const request = indexedDB.deleteDatabase(name);
+          request.onsuccess = resolve;
+          request.onerror = resolve;
+          request.onblocked = resolve;
+        });
+      }
+
+      async function resetSafari() {
+        try {
+          if ("serviceWorker" in navigator) {
+            const registrations = await navigator.serviceWorker.getRegistrations();
+            await Promise.all(registrations.map((item) => item.unregister()));
+          }
+          if ("caches" in window) {
+            const keys = await caches.keys();
+            await Promise.all(keys.map((key) => caches.delete(key)));
+          }
+          await deleteDatabase("wansui-v1");
+          localStorage.clear();
+          sessionStorage.clear();
+          title.textContent = "修复完成";
+          message.textContent = "Safari 的旧缓存已经清掉。点下面按钮重新进入，会拉取最新版本。";
+          home.hidden = false;
+        } catch (error) {
+          title.textContent = "需要手动清理";
+          message.textContent = "Safari 没有允许自动清理。请到 Safari 设置里清除 yansiwen1125.github.io 的网站数据。";
+          home.hidden = false;
+        }
+      }
+
+      resetSafari();
+    </script>
+  </body>
+</html>

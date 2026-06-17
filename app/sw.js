@@ -1,7 +1,8 @@
-const CACHE = "wansui-v3";
+const CACHE = "wansui-v4";
 const ASSETS = [
   "./",
   "./index.html",
+  "./safari-reset.html",
   "./config.js",
   "./manifest.webmanifest",
   "./icons/icon.svg",

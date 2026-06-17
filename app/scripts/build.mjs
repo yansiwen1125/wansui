@@ -2,6 +2,7 @@ import { cp, mkdir, rm } from "node:fs/promises";
 
 const files = [
   "index.html",
+  "safari-reset.html",
   "config.js",
   "manifest.webmanifest",
   "sw.js",
