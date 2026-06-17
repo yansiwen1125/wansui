@@ -80,6 +80,13 @@ on public.users for insert
 to anon
 with check (true);
 
+drop policy if exists "v1.1 users update" on public.users;
+create policy "v1.1 users update"
+on public.users for update
+to anon
+using (true)
+with check (true);
+
 drop policy if exists "v1.1 tasks read" on public.tasks;
 create policy "v1.1 tasks read"
 on public.tasks for select
@@ -119,6 +126,6 @@ to anon
 using (date >= date '2026-06-10')
 with check (date >= date '2026-06-10');
 
-grant select, insert on public.users to anon;
+grant select, insert, update on public.users to anon;
 grant select, insert, update on public.tasks to anon;
 grant select, insert, update on public.checkins to anon;

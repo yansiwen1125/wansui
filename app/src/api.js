@@ -66,10 +66,21 @@ export async function fetchUsers() {
 
 export async function saveUser(username, createdAt = new Date().toISOString()) {
   if (!enabled) return { username, createdAt };
-  const result = await request("users?on_conflict=username", {
+  const existing = await request(`users?username=eq.${encodeURIComponent(username)}&select=username,created_at`);
+  if (existing.length) {
+    return {
+      username: existing[0].username,
+      createdAt: existing[0].created_at ?? createdAt
+    };
+  }
+  const result = await request("users", {
     method: "POST",
-    headers: { Prefer: "resolution=merge-duplicates,return=representation" },
-    body: JSON.stringify([{ username, created_at: createdAt }])
+    headers: { Prefer: "return=representation" },
+    body: JSON.stringify({ username, created_at: createdAt })
+  }).catch(async (error) => {
+    const retry = await request(`users?username=eq.${encodeURIComponent(username)}&select=username,created_at`);
+    if (retry.length) return retry;
+    throw error;
   });
   const saved = result?.[0];
   return {
@@ -88,6 +99,7 @@ export async function fetchTasks(username = LEGACY_USERNAME) {
 
 export async function saveTasksRemote(username = LEGACY_USERNAME, tasks = []) {
   if (!enabled) return tasks;
+  await saveUser(username);
   const payload = tasks.map((task, index) => {
     const normalized = normalizeTask(task, index);
     return {
