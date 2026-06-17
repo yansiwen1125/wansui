@@ -19,6 +19,7 @@ import {
   isTaskActiveOn,
   monthGrid,
   monthLabel,
+  normalizeTask,
   normalizeUsername,
   overviewStats,
   recordKey,
@@ -30,7 +31,16 @@ import {
   visibleTasks,
   weekKeys
 } from "./domain.js";
-import { cloudEnabled, fetchRecords, initializeCloud, saveRecord } from "./api.js";
+import {
+  cloudEnabled,
+  fetchRecords,
+  fetchTasks,
+  fetchUsers,
+  initializeCloud,
+  saveRecord,
+  saveTasksRemote,
+  saveUser
+} from "./api.js";
 import {
   currentUsername,
   ensureLegacyUser,
@@ -58,6 +68,7 @@ const state = {
   saving: new Set(),
   message: "",
   offline: !navigator.onLine,
+  cloudStatus: cloudEnabled() ? "syncing" : "local",
   taskMonths: {},
   editingTaskId: "",
   hiddenExpanded: false,
@@ -78,6 +89,10 @@ function currentHiddenTasks() {
 
 function recordArray() {
   return [...state.records.values()];
+}
+
+function currentUserRecords() {
+  return recordArray().filter((item) => (item.username ?? state.username) === state.username);
 }
 
 function loadRecordArray(records) {
@@ -133,7 +148,13 @@ function bottomNav(active) {
 
 function statusLine() {
   if (state.offline) return `<div class="network-status">离线，只能查看</div>`;
-  return `<div class="sync-status"><i></i><span>${cloudEnabled() ? "已同步" : "本机模式"}</span></div>`;
+  if (state.cloudStatus === "synced") {
+    return `<div class="sync-status"><i></i><span>已同步</span></div>`;
+  }
+  if (state.cloudStatus === "syncing") {
+    return `<div class="sync-status local"><i></i><span>同步中</span></div>`;
+  }
+  return `<div class="sync-status local"><i></i><span>本机模式</span></div>`;
 }
 
 function userSwitch() {
@@ -411,6 +432,28 @@ function render() {
   bindEvents();
 }
 
+function mergeUsers(localUsers, remoteUsers) {
+  const merged = new Map();
+  [...localUsers, ...remoteUsers].forEach((user) => {
+    if (!user?.username) return;
+    merged.set(user.username, {
+      username: user.username,
+      createdAt: user.createdAt ?? new Date().toISOString()
+    });
+  });
+  return [...merged.values()].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
+}
+
+async function refreshUsersFromCloud() {
+  if (!cloudEnabled() || !navigator.onLine) return loadUsers();
+  const remoteUsers = await fetchUsers();
+  const localUsers = await loadUsers();
+  const merged = mergeUsers(localUsers, remoteUsers);
+  await saveUsers(merged);
+  state.users = merged;
+  return merged;
+}
+
 function bindEvents() {
   document.querySelectorAll("[data-route]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -441,7 +484,12 @@ function bindEvents() {
       render();
       return;
     }
-    const users = await loadUsers();
+    let users = await loadUsers();
+    if (!users.some((user) => user.username === username) && cloudEnabled() && navigator.onLine) {
+      try {
+        users = await refreshUsersFromCloud();
+      } catch {}
+    }
     if (!users.some((user) => user.username === username)) {
       state.route = "register";
       state.formError = "这个用户名还没有注册";
@@ -473,9 +521,20 @@ function bindEvents() {
       render();
       return;
     }
-    users.push({ username, createdAt: new Date().toISOString() });
+    const createdAt = new Date().toISOString();
+    users.push({ username, createdAt });
     await saveUsers(users);
-    await saveTasks(username, createDefaultTasks(todayKey()));
+    const defaultTasks = createDefaultTasks(todayKey());
+    await saveTasks(username, defaultTasks);
+    if (cloudEnabled() && navigator.onLine) {
+      try {
+        await saveUser(username, createdAt);
+        await saveTasksRemote(username, defaultTasks);
+        state.cloudStatus = "synced";
+      } catch {
+        state.cloudStatus = "local";
+      }
+    }
     await login(username);
   });
 
@@ -585,7 +644,8 @@ async function toggleTask(taskId) {
       completed: saved.completed,
       updatedAt: saved.updated_at
     });
-    await saveCache(recordArray());
+    await saveCache(state.username, currentUserRecords());
+    state.cloudStatus = cloudEnabled() && navigator.onLine ? "synced" : "local";
   } catch {
     state.records.set(key, {
       username: state.username,
@@ -594,7 +654,8 @@ async function toggleTask(taskId) {
       completed: next,
       updatedAt: new Date().toISOString()
     });
-    await saveCache(recordArray());
+    await saveCache(state.username, currentUserRecords());
+    state.cloudStatus = "local";
     showMessage("已存本机，待同步");
   } finally {
     state.saving.delete(key);
@@ -605,6 +666,21 @@ async function toggleTask(taskId) {
 async function persistTasks() {
   state.tasks = sortTasks(state.tasks).map((task, index) => ({ ...task, sortOrder: index + 1, updatedAt: new Date().toISOString() }));
   await saveTasks(state.username, state.tasks);
+  if (cloudEnabled() && navigator.onLine) {
+    try {
+      const saved = await saveTasksRemote(state.username, state.tasks);
+      if (saved.length) {
+        state.tasks = saved.map((task, index) => normalizeTask(task, index));
+        for (const task of state.tasks) {
+          if (!state.taskMonths[task.id]) state.taskMonths[task.id] = startOfMonth(todayKey());
+        }
+      }
+      state.cloudStatus = "synced";
+    } catch {
+      state.cloudStatus = "local";
+      showMessage("已存本机，待同步");
+    }
+  }
 }
 
 async function moveTask(taskId, direction) {
@@ -752,21 +828,64 @@ function showMessage(message) {
 
 async function syncFromCloud() {
   await ensureUserState();
-  const cached = await loadCache();
+  const cached = await loadCache(state.username);
   if (cached.length) loadRecordArray(cached);
   state.loading = false;
+  state.cloudStatus = cloudEnabled() ? "syncing" : "local";
   render();
-  if (!navigator.onLine || !cloudEnabled()) return;
-  if (state.username !== LEGACY_USERNAME) return;
+  if (!navigator.onLine || !cloudEnabled()) {
+    state.cloudStatus = "local";
+    render();
+    return;
+  }
   try {
+    await initializeCloud();
+    try {
+      await refreshUsersFromCloud();
+    } catch (error) {
+      if (state.username !== LEGACY_USERNAME) throw error;
+    }
+    const localUsers = state.users.length ? state.users : await loadUsers();
+    if (!localUsers.some((user) => user.username === state.username)) {
+      const createdAt = new Date().toISOString();
+      const savedUser = await saveUser(state.username, createdAt);
+      const merged = mergeUsers(localUsers, [savedUser]);
+      await saveUsers(merged);
+      state.users = merged;
+    }
+    let remoteTasks = [];
+    try {
+      remoteTasks = await fetchTasks(state.username);
+    } catch (error) {
+      if (state.username !== LEGACY_USERNAME) throw error;
+    }
+    if (remoteTasks.length) {
+      state.tasks = remoteTasks.map((task, index) => normalizeTask(task, index));
+      await saveTasks(state.username, state.tasks);
+    } else if (state.tasks.length) {
+      try {
+        const savedTasks = await saveTasksRemote(state.username, state.tasks);
+        if (savedTasks.length) state.tasks = savedTasks.map((task, index) => normalizeTask(task, index));
+      } catch (error) {
+        if (state.username !== LEGACY_USERNAME) throw error;
+      }
+    }
+    for (const task of state.tasks) {
+      if (!state.taskMonths[task.id]) state.taskMonths[task.id] = startOfMonth(todayKey());
+    }
+    for (const item of currentUserRecords()) {
+      await saveRecord(item.taskId, item.date, item.completed, state.username);
+    }
     const cloud = await fetchRecords(state.username);
     if (cloud) {
       loadRecordArray(cloud);
-      await saveCache(recordArray());
+      await saveCache(state.username, currentUserRecords());
       render();
     }
-    initializeCloud().catch(() => {});
+    state.cloudStatus = "synced";
+    render();
   } catch (error) {
+    state.cloudStatus = "local";
     showMessage(`${error.message || "云端连接失败"}，正在显示缓存`);
   }
 }

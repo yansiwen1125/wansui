@@ -1,4 +1,4 @@
-import { EFFECTIVE_START_DATE, LEGACY_USERNAME } from "./domain.js";
+import { EFFECTIVE_START_DATE, LEGACY_USERNAME, normalizeTask } from "./domain.js";
 
 const config = window.WANSUI_CONFIG ?? {};
 const enabled = Boolean(config.supabaseUrl && config.supabasePublishableKey);
@@ -53,6 +53,59 @@ export async function initializeCloud() {
       last_known_time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone
     })
   });
+}
+
+export async function fetchUsers() {
+  if (!enabled) return [];
+  const users = await request("users?select=username,created_at&order=created_at.asc");
+  return (users ?? []).map((user) => ({
+    username: user.username,
+    createdAt: user.created_at ?? new Date().toISOString()
+  }));
+}
+
+export async function saveUser(username, createdAt = new Date().toISOString()) {
+  if (!enabled) return { username, createdAt };
+  const result = await request("users?on_conflict=username", {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=representation" },
+    body: JSON.stringify([{ username, created_at: createdAt }])
+  });
+  const saved = result?.[0];
+  return {
+    username: saved?.username ?? username,
+    createdAt: saved?.created_at ?? createdAt
+  };
+}
+
+export async function fetchTasks(username = LEGACY_USERNAME) {
+  if (!enabled) return [];
+  const tasks = await request(
+    `tasks?username=eq.${encodeURIComponent(username)}&select=id,username,name,color,sort_order,created_date,hidden_periods,updated_at&order=sort_order.asc`
+  );
+  return (tasks ?? []).map((task, index) => normalizeTask(task, index));
+}
+
+export async function saveTasksRemote(username = LEGACY_USERNAME, tasks = []) {
+  if (!enabled) return tasks;
+  const payload = tasks.map((task, index) => {
+    const normalized = normalizeTask(task, index);
+    return {
+      username,
+      id: normalized.id,
+      name: normalized.name,
+      color: normalized.color,
+      sort_order: normalized.sortOrder ?? index + 1,
+      created_date: normalized.createdDate,
+      hidden_periods: normalized.hiddenPeriods ?? []
+    };
+  });
+  const result = await request("tasks?on_conflict=username,id", {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=representation" },
+    body: JSON.stringify(payload)
+  });
+  return (result ?? []).map((task, index) => normalizeTask(task, index));
 }
 
 export async function fetchRecords(username = LEGACY_USERNAME) {

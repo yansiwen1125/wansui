@@ -5,6 +5,10 @@ const STORE = "state";
 const CURRENT_USER_KEY = "wansui:current-user";
 const LEGACY_LOGIN_KEY = "wansui:logged-in";
 
+function cacheKey(username = LEGACY_USERNAME) {
+  return `records:v1.1:${username || LEGACY_USERNAME}`;
+}
+
 function openDatabase() {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, 1);
@@ -37,14 +41,15 @@ async function setValue(key, value) {
   });
 }
 
-export async function loadCache() {
-  const records = await getValue("records:v1.1", null);
+export async function loadCache(username = LEGACY_USERNAME) {
+  const records = await getValue(cacheKey(username), null);
   if (records) return records;
-  return getValue("records", []);
+  if (username === LEGACY_USERNAME) return getValue("records", []);
+  return [];
 }
 
-export async function saveCache(records) {
-  await setValue("records:v1.1", records);
+export async function saveCache(username, records) {
+  await setValue(cacheKey(username), records);
 }
 
 export async function loadUsers() {
