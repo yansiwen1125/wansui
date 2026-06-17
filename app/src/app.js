@@ -454,6 +454,18 @@ async function refreshUsersFromCloud() {
   return merged;
 }
 
+async function ensureRemoteCurrentUser(users = state.users) {
+  if (!cloudEnabled() || !navigator.onLine || !state.username) return users;
+  const localUsers = users?.length ? users : await loadUsers();
+  const existing = localUsers.find((user) => user.username === state.username);
+  const createdAt = existing?.createdAt ?? new Date().toISOString();
+  const savedUser = await saveUser(state.username, createdAt);
+  const merged = mergeUsers(localUsers, [savedUser]);
+  await saveUsers(merged);
+  state.users = merged;
+  return merged;
+}
+
 function bindEvents() {
   document.querySelectorAll("[data-route]").forEach((button) => {
     button.addEventListener("click", () => {
@@ -668,6 +680,7 @@ async function persistTasks() {
   await saveTasks(state.username, state.tasks);
   if (cloudEnabled() && navigator.onLine) {
     try {
+      await ensureRemoteCurrentUser();
       const saved = await saveTasksRemote(state.username, state.tasks);
       if (saved.length) {
         state.tasks = saved.map((task, index) => normalizeTask(task, index));
@@ -845,14 +858,7 @@ async function syncFromCloud() {
     } catch (error) {
       if (state.username !== LEGACY_USERNAME) throw error;
     }
-    const localUsers = state.users.length ? state.users : await loadUsers();
-    if (!localUsers.some((user) => user.username === state.username)) {
-      const createdAt = new Date().toISOString();
-      const savedUser = await saveUser(state.username, createdAt);
-      const merged = mergeUsers(localUsers, [savedUser]);
-      await saveUsers(merged);
-      state.users = merged;
-    }
+    await ensureRemoteCurrentUser();
     let remoteTasks = [];
     try {
       remoteTasks = await fetchTasks(state.username);
