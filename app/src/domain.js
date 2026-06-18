@@ -136,6 +136,14 @@ export function sortTasks(tasks) {
   return [...tasks].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
 }
 
+export function applyTaskOrder(tasks, orderedIds) {
+  const existingIds = tasks.map((task) => task.id);
+  const uniqueOrderedIds = [...new Set(orderedIds)].filter((id) => existingIds.includes(id));
+  const remainingIds = existingIds.filter((id) => !uniqueOrderedIds.includes(id));
+  const orderMap = new Map([...uniqueOrderedIds, ...remainingIds].map((id, index) => [id, index + 1]));
+  return tasks.map((task) => ({ ...task, sortOrder: orderMap.get(task.id) ?? task.sortOrder }));
+}
+
 export function isTaskHiddenNow(task) {
   return (task.hiddenPeriods ?? []).some((period) => period.start && !period.end);
 }
@@ -150,6 +158,18 @@ export function hiddenTasks(tasks) {
 
 export function visibleTasks(tasks) {
   return sortTasks(tasks).filter((task) => !isTaskHiddenNow(task));
+}
+
+export function moveTaskToVisibleEnd(tasks, taskId) {
+  const visibleIds = visibleTasks(tasks).filter((task) => task.id !== taskId).map((task) => task.id);
+  const hiddenIds = hiddenTasks(tasks).filter((task) => task.id !== taskId).map((task) => task.id);
+  return applyTaskOrder(tasks, [...visibleIds, taskId, ...hiddenIds]);
+}
+
+export function moveTaskToHiddenEnd(tasks, taskId) {
+  const visibleIds = visibleTasks(tasks).filter((task) => task.id !== taskId).map((task) => task.id);
+  const hiddenIds = hiddenTasks(tasks).filter((task) => task.id !== taskId).map((task) => task.id);
+  return applyTaskOrder(tasks, [...visibleIds, ...hiddenIds, taskId]);
 }
 
 export function isTaskActiveOn(task, date) {

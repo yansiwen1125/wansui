@@ -4,6 +4,7 @@ import {
   EFFECTIVE_START_DATE,
   INVITE_CODE,
   LEGACY_USERNAME,
+  applyTaskOrder,
   activeTasks,
   addDays,
   addMonths,
@@ -19,6 +20,8 @@ import {
   isTaskActiveOn,
   monthGrid,
   monthLabel,
+  moveTaskToHiddenEnd,
+  moveTaskToVisibleEnd,
   normalizeTask,
   normalizeUsername,
   overviewStats,
@@ -705,8 +708,7 @@ async function moveTask(taskId, direction) {
   const [task] = ordered.splice(index, 1);
   ordered.splice(targetIndex, 0, task);
   const hidden = currentHiddenTasks();
-  const nextOrder = [...ordered, ...hidden].map((item, idx) => item.id);
-  state.tasks = state.tasks.map((taskItem) => ({ ...taskItem, sortOrder: nextOrder.indexOf(taskItem.id) + 1 }));
+  state.tasks = applyTaskOrder(state.tasks, [...ordered, ...hidden].map((item) => item.id));
   await persistTasks();
   render();
 }
@@ -763,9 +765,7 @@ function syncTaskOrderFromRows() {
   const orderedIds = [...document.querySelectorAll(".edit-list [data-edit-row]")].map((row) => row.dataset.editRow);
   const visible = orderedIds.map((id) => state.tasks.find((task) => task.id === id)).filter(Boolean);
   const hidden = currentHiddenTasks();
-  const nextOrder = [...visible, ...hidden].map((item, index) => [item.id, index + 1]);
-  const orderMap = new Map(nextOrder);
-  state.tasks = state.tasks.map((taskItem) => ({ ...taskItem, sortOrder: orderMap.get(taskItem.id) ?? taskItem.sortOrder }));
+  state.tasks = applyTaskOrder(state.tasks, [...visible, ...hidden].map((item) => item.id));
 }
 
 async function hideTask(taskId) {
@@ -775,6 +775,7 @@ async function hideTask(taskId) {
     if ((task.hiddenPeriods ?? []).some((period) => !period.end)) return task;
     return { ...task, hiddenPeriods: [...(task.hiddenPeriods ?? []), { start: today, end: null }] };
   });
+  state.tasks = moveTaskToHiddenEnd(state.tasks, taskId);
   await persistTasks();
   render();
 }
@@ -788,6 +789,7 @@ async function restoreTask(taskId) {
       hiddenPeriods: (task.hiddenPeriods ?? []).map((period) => period.end ? period : { ...period, end: today })
     };
   });
+  state.tasks = moveTaskToVisibleEnd(state.tasks, taskId);
   await persistTasks();
   state.hiddenExpanded = false;
   render();
@@ -814,7 +816,7 @@ async function saveTaskForm(form) {
       render();
       return;
     }
-    state.tasks.push({
+    const task = {
       id: `task_${Date.now().toString(36)}`,
       name,
       color,
@@ -822,7 +824,9 @@ async function saveTaskForm(form) {
       createdDate: todayKey(),
       hiddenPeriods: [],
       updatedAt: new Date().toISOString()
-    });
+    };
+    state.tasks.push(task);
+    state.tasks = moveTaskToVisibleEnd(state.tasks, task.id);
   }
   await persistTasks();
   state.formError = "";

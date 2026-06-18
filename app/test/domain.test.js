@@ -4,12 +4,16 @@ import {
   EFFECTIVE_START_DATE,
   TASKS,
   addDays,
+  applyTaskOrder,
   completionCount,
   createDefaultTasks,
   isTaskActiveOn,
   monthGrid,
+  moveTaskToHiddenEnd,
+  moveTaskToVisibleEnd,
   overviewStats,
   recordKey,
+  sortTasks,
   startOfWeek,
   taskStats,
   validateUsername,
@@ -103,6 +107,45 @@ test("hidden task is not counted in daily completion denominator", () => {
     [tasks[1].id, "2026-06-16"]
   ]);
   assert.equal(completionCount(map, "2026-06-16", tasks), 1);
+});
+
+test("custom task order is preserved for cloud sort order", () => {
+  const tasks = createDefaultTasks("2026-06-10");
+  const reordered = applyTaskOrder(tasks, [
+    tasks[2].id,
+    tasks[0].id,
+    tasks[1].id,
+    tasks[3].id
+  ]);
+  assert.deepEqual(sortTasks(reordered).map((task) => task.id), [
+    tasks[2].id,
+    tasks[0].id,
+    tasks[1].id,
+    tasks[3].id
+  ]);
+});
+
+test("hidden and restored tasks move to the end of their current section", () => {
+  const tasks = createDefaultTasks("2026-06-10");
+  tasks[1].hiddenPeriods = [{ start: "2026-06-16", end: null }];
+  const hiddenLast = moveTaskToHiddenEnd(tasks, tasks[1].id);
+  assert.deepEqual(sortTasks(hiddenLast).map((task) => task.id), [
+    tasks[0].id,
+    tasks[2].id,
+    tasks[3].id,
+    tasks[1].id
+  ]);
+
+  const restored = hiddenLast.map((task) => task.id === tasks[1].id
+    ? { ...task, hiddenPeriods: [{ start: "2026-06-16", end: "2026-06-18" }] }
+    : task);
+  const visibleLast = moveTaskToVisibleEnd(restored, tasks[1].id);
+  assert.deepEqual(sortTasks(visibleLast).map((task) => task.id), [
+    tasks[0].id,
+    tasks[2].id,
+    tasks[3].id,
+    tasks[1].id
+  ]);
 });
 
 test("username validation accepts the v1.1 rule set", () => {

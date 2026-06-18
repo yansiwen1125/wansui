@@ -94,7 +94,7 @@ export async function fetchTasks(username = LEGACY_USERNAME) {
   const tasks = await request(
     `tasks?username=eq.${encodeURIComponent(username)}&select=id,username,name,color,sort_order,created_date,hidden_periods,updated_at&order=sort_order.asc`
   );
-  return (tasks ?? []).map((task, index) => normalizeTask(task, index));
+  return (tasks ?? []).map((task, index) => normalizeTask(task, index)).sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
 export async function saveTasksRemote(username = LEGACY_USERNAME, tasks = []) {
@@ -117,7 +117,7 @@ export async function saveTasksRemote(username = LEGACY_USERNAME, tasks = []) {
     headers: { Prefer: "resolution=merge-duplicates,return=representation" },
     body: JSON.stringify(payload)
   });
-  return (result ?? []).map((task, index) => normalizeTask(task, index));
+  return (result ?? []).map((task, index) => normalizeTask(task, index)).sort((a, b) => a.sortOrder - b.sortOrder);
 }
 
 export async function fetchRecords(username = LEGACY_USERNAME) {
