@@ -1,0 +1,73 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+    <meta name="theme-color" content="#faf9f6">
+    <title>万岁云端自检</title>
+    <style>
+      body {
+        margin: 0;
+        padding: 32px 24px;
+        background: #faf9f6;
+        color: #24231f;
+        font-family: -apple-system, BlinkMacSystemFont, "PingFang SC", "Microsoft YaHei", sans-serif;
+      }
+      h1 { font-size: 28px; margin: 0 0 20px; }
+      pre {
+        white-space: pre-wrap;
+        word-break: break-word;
+        padding: 16px;
+        border: 1px solid #dedbd4;
+        border-radius: 18px;
+        background: #fff;
+        font-size: 14px;
+        line-height: 1.6;
+      }
+    </style>
+    <script src="./config.js?v=1.2.4"></script>
+  </head>
+  <body>
+    <h1>云端自检</h1>
+    <pre id="result">正在检查...</pre>
+    <script>
+      const out = document.querySelector("#result");
+      const config = window.WANSUI_CONFIG || {};
+      const baseUrl = (config.supabaseUrl || "").replace(/\/rest\/v1\/?$/, "").replace(/\/+$/, "");
+      const key = config.supabasePublishableKey || "";
+      const maskedKey = key ? `${key.slice(0, 16)}...${key.slice(-6)}` : "(空)";
+
+      async function check(path, options = {}) {
+        try {
+          const response = await fetch(`${baseUrl}/rest/v1/${path}`, {
+            ...options,
+            headers: {
+              apikey: key,
+              ...(options.headers || {})
+            }
+          });
+          const text = await response.text();
+          return `${path}\n状态：${response.status}\n返回：${text.slice(0, 500) || "(空)"}`;
+        } catch (error) {
+          return `${path}\n错误：${error.message}`;
+        }
+      }
+
+      async function main() {
+        const lines = [
+          `Supabase URL：${baseUrl || "(空)"}`,
+          `Publishable Key：${maskedKey}`,
+          "",
+          await check("users?select=username&limit=1"),
+          "",
+          await check("tasks?select=id,username&limit=1"),
+          "",
+          await check("task_versions?select=username,effective_date&limit=1")
+        ];
+        out.textContent = lines.join("\n");
+      }
+
+      main();
+    </script>
+  </body>
+</html>
