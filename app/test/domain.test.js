@@ -159,6 +159,26 @@ test("task edits only affect the effective date and later dates", () => {
   assert.equal(tasksForDate(versions, "2026-06-18")[0].name, "新名字");
 });
 
+test("selected-date edits apply from that date until a newer version", () => {
+  const tasks = createDefaultTasks("2026-06-10");
+  const reorderedFrom16 = applyTaskOrder(tasks, [tasks[2].id, tasks[0].id, tasks[1].id, tasks[3].id]);
+  const renamedFrom18 = reorderedFrom16.map((task) => task.id === tasks[2].id ? { ...task, name: "18号名字" } : task);
+  const versions = upsertTaskVersion(
+    upsertTaskVersion([{ effectiveDate: "2026-06-10", tasks }], "2026-06-16", reorderedFrom16),
+    "2026-06-18",
+    renamedFrom18
+  );
+  assert.deepEqual(sortTasks(tasksForDate(versions, "2026-06-15")).map((task) => task.id), tasks.map((task) => task.id));
+  assert.deepEqual(sortTasks(tasksForDate(versions, "2026-06-16")).map((task) => task.id), [
+    tasks[2].id,
+    tasks[0].id,
+    tasks[1].id,
+    tasks[3].id
+  ]);
+  assert.equal(tasksForDate(versions, "2026-06-17")[0].name, tasks[2].name);
+  assert.equal(tasksForDate(versions, "2026-06-18")[0].name, "18号名字");
+});
+
 test("restored task is visible at the end only from restore date", () => {
   const tasks = createDefaultTasks("2026-06-10");
   const hidden = moveTaskToHiddenEnd(tasks.map((task) => task.id === tasks[1].id

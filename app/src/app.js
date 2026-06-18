@@ -98,12 +98,16 @@ function currentTasks(date = state.selectedDate) {
   return activeTasks(tasksAt(date), date);
 }
 
-function currentVisibleTasks() {
-  return visibleTasks(tasksAt(todayKey()));
+function editEffectiveDate() {
+  return isEditable(state.selectedDate) ? state.selectedDate : todayKey();
 }
 
-function currentHiddenTasks() {
-  return hiddenTasks(tasksAt(todayKey()));
+function currentVisibleTasks(date = todayKey()) {
+  return visibleTasks(tasksAt(date));
+}
+
+function currentHiddenTasks(date = todayKey()) {
+  return hiddenTasks(tasksAt(date));
 }
 
 function recordArray() {
@@ -447,8 +451,9 @@ function renderTasks() {
 }
 
 function renderEdit() {
-  const visible = currentVisibleTasks();
-  const hidden = currentHiddenTasks();
+  const date = editEffectiveDate();
+  const visible = currentVisibleTasks(date);
+  const hidden = currentHiddenTasks(date);
   const canAdd = visible.length < 9;
   app.innerHTML = `
     <main class="screen app-screen edit-screen">
@@ -456,7 +461,7 @@ function renderEdit() {
         <button data-route="home">${chevron("left")}</button>
         <h1>编辑打卡事件</h1>
       </header>
-      <p class="edit-tip">拖动排序，编辑名称和颜色，隐藏不删除历史。</p>
+      <p class="edit-tip">${dateLabel(date)}起生效，之前的历史不变。</p>
       <section class="edit-list">
         ${visible.map((task) => `<div class="edit-row" style="--task-color:${task.color}" data-edit-row="${task.id}">
           <button data-drag-handle="${task.id}" class="icon-button drag" aria-label="拖动排序">${icon("drag")}</button>
@@ -497,7 +502,8 @@ function deleteDialog() {
 }
 
 function renderTaskForm(mode) {
-  const task = tasksAt(todayKey()).find((item) => item.id === state.editingTaskId);
+  const date = editEffectiveDate();
+  const task = tasksAt(date).find((item) => item.id === state.editingTaskId);
   const editing = mode === "edit-task" && task;
   const title = editing ? "编辑打卡事件" : "新增打卡事件";
   const name = editing ? task.name : "";
@@ -809,11 +815,10 @@ async function toggleTask(taskId) {
   }
 }
 
-async function persistTasks(previousTasks = state.tasks, previousVersions = state.taskVersions) {
-  const today = todayKey();
+async function persistTasks(previousTasks = state.tasks, previousVersions = state.taskVersions, effectiveDate = editEffectiveDate()) {
   const normalized = sortTasks(state.tasks).map((task, index) => ({ ...task, sortOrder: index + 1, updatedAt: new Date().toISOString() }));
-  const nextVersions = upsertTaskVersion(state.taskVersions, today, normalized);
-  const version = createTaskVersion(today, normalized);
+  const nextVersions = upsertTaskVersion(state.taskVersions, effectiveDate, normalized);
+  const version = createTaskVersion(effectiveDate, normalized);
   const rollback = async () => {
     state.tasks = previousTasks;
     state.taskVersions = previousVersions;
@@ -841,26 +846,28 @@ async function persistTasks(previousTasks = state.tasks, previousVersions = stat
     }
     state.cloudStatus = cloudEnabled() ? "synced" : "local";
     return true;
-  } catch {
+  } catch (error) {
+    console.error("persistTasks failed", error);
     await rollback();
-    showMessage("保存失败，请稍后重试");
+    showMessage(error.message || "保存失败，请稍后重试");
     return false;
   }
 }
 
 async function moveTask(taskId, direction) {
-  const visible = currentVisibleTasks();
+  const date = editEffectiveDate();
+  const visible = currentVisibleTasks(date);
   const index = visible.findIndex((task) => task.id === taskId);
   const targetIndex = index + direction;
   if (index < 0 || targetIndex < 0 || targetIndex >= visible.length) return;
-  const previousTasks = tasksAt(todayKey());
+  const previousTasks = tasksAt(date);
   const previousVersions = state.taskVersions;
   const ordered = [...visible];
   const [task] = ordered.splice(index, 1);
   ordered.splice(targetIndex, 0, task);
-  const hidden = currentHiddenTasks();
+  const hidden = currentHiddenTasks(date);
   state.tasks = applyTaskOrder(previousTasks, [...ordered, ...hidden].map((item) => item.id));
-  await persistTasks(previousTasks, previousVersions);
+  await persistTasks(previousTasks, previousVersions, date);
   render();
 }
 
@@ -876,7 +883,7 @@ function bindDragSorting() {
     handle.addEventListener("pointerdown", (event) => {
       draggingId = handle.dataset.dragHandle;
       pointerId = event.pointerId;
-      dragStartTasks = tasksAt(todayKey());
+      dragStartTasks = tasksAt(editEffectiveDate());
       dragStartVersions = state.taskVersions;
       handle.setPointerCapture?.(pointerId);
       list.classList.add("sorting");
@@ -900,7 +907,7 @@ function bindDragSorting() {
       if (!draggingId || event.pointerId !== pointerId) return;
       draggingId = "";
       pointerId = null;
-      await persistTasks(dragStartTasks, dragStartVersions);
+      await persistTasks(dragStartTasks, dragStartVersions, editEffectiveDate());
       dragStartTasks = [];
       dragStartVersions = [];
       render();
@@ -923,40 +930,41 @@ function rowById(taskId) {
 }
 
 function syncTaskOrderFromRows() {
+  const date = editEffectiveDate();
   const orderedIds = [...document.querySelectorAll(".edit-list [data-edit-row]")].map((row) => row.dataset.editRow);
-  const todayTasks = tasksAt(todayKey());
+  const todayTasks = tasksAt(date);
   const visible = orderedIds.map((id) => todayTasks.find((task) => task.id === id)).filter(Boolean);
-  const hidden = currentHiddenTasks();
+  const hidden = currentHiddenTasks(date);
   state.tasks = applyTaskOrder(todayTasks, [...visible, ...hidden].map((item) => item.id));
 }
 
 async function hideTask(taskId) {
-  const today = todayKey();
-  const previousTasks = tasksAt(today);
+  const date = editEffectiveDate();
+  const previousTasks = tasksAt(date);
   const previousVersions = state.taskVersions;
   state.tasks = previousTasks.map((task) => {
     if (task.id !== taskId) return task;
     if ((task.hiddenPeriods ?? []).some((period) => !period.end)) return task;
-    return { ...task, hiddenPeriods: [...(task.hiddenPeriods ?? []), { start: today, end: null }] };
+    return { ...task, hiddenPeriods: [...(task.hiddenPeriods ?? []), { start: date, end: null }] };
   });
   state.tasks = moveTaskToHiddenEnd(state.tasks, taskId);
-  await persistTasks(previousTasks, previousVersions);
+  await persistTasks(previousTasks, previousVersions, date);
   render();
 }
 
 async function restoreTask(taskId) {
-  const today = todayKey();
-  const previousTasks = tasksAt(today);
+  const date = editEffectiveDate();
+  const previousTasks = tasksAt(date);
   const previousVersions = state.taskVersions;
   state.tasks = previousTasks.map((task) => {
     if (task.id !== taskId) return task;
     return {
       ...task,
-      hiddenPeriods: (task.hiddenPeriods ?? []).map((period) => period.end ? period : { ...period, end: today })
+      hiddenPeriods: (task.hiddenPeriods ?? []).map((period) => period.end ? period : { ...period, end: date })
     };
   });
   state.tasks = moveTaskToVisibleEnd(state.tasks, taskId);
-  const saved = await persistTasks(previousTasks, previousVersions);
+  const saved = await persistTasks(previousTasks, previousVersions, date);
   if (saved) state.hiddenExpanded = false;
   render();
 }
@@ -974,12 +982,13 @@ async function saveTaskForm(form) {
     render();
     return;
   }
-  const previousTasks = tasksAt(todayKey());
+  const date = editEffectiveDate();
+  const previousTasks = tasksAt(date);
   const previousVersions = state.taskVersions;
   if (state.route === "edit-task") {
     state.tasks = previousTasks.map((task) => task.id === state.editingTaskId ? { ...task, name, color } : task);
   } else {
-    if (currentVisibleTasks().length >= 9) {
+    if (currentVisibleTasks(date).length >= 9) {
       state.formError = "最多只能同时显示 9 个打卡事件";
       render();
       return;
@@ -988,15 +997,15 @@ async function saveTaskForm(form) {
       id: `task_${Date.now().toString(36)}`,
       name,
       color,
-      sortOrder: currentVisibleTasks().length + 1,
-      createdDate: todayKey(),
+      sortOrder: currentVisibleTasks(date).length + 1,
+      createdDate: date,
       hiddenPeriods: [],
       updatedAt: new Date().toISOString()
     };
     state.tasks = [...previousTasks, task];
     state.tasks = moveTaskToVisibleEnd(state.tasks, task.id);
   }
-  const saved = await persistTasks(previousTasks, previousVersions);
+  const saved = await persistTasks(previousTasks, previousVersions, date);
   if (saved) {
     state.formError = "";
     state.route = "edit";
@@ -1006,8 +1015,8 @@ async function saveTaskForm(form) {
 
 async function deleteTask(taskId) {
   if (!taskId) return;
-  const today = todayKey();
-  const previousTasks = tasksAt(today);
+  const date = editEffectiveDate();
+  const previousTasks = tasksAt(date);
   const previousVersions = state.taskVersions;
   if (!previousTasks.some((task) => task.id === taskId)) {
     state.confirmingDeleteTaskId = "";
@@ -1026,8 +1035,8 @@ async function deleteTask(taskId) {
   }
   const nextTasks = sortTasks(previousTasks.filter((task) => task.id !== taskId))
     .map((task, index) => ({ ...task, sortOrder: index + 1, updatedAt: new Date().toISOString() }));
-  const nextVersions = upsertTaskVersion(previousVersions, today, nextTasks);
-  const version = createTaskVersion(today, nextTasks);
+  const nextVersions = upsertTaskVersion(previousVersions, date, nextTasks);
+  const version = createTaskVersion(date, nextTasks);
   try {
     if (cloudEnabled()) {
       await ensureRemoteCurrentUser();
@@ -1052,6 +1061,7 @@ async function deleteTask(taskId) {
     state.cloudStatus = cloudEnabled() ? "synced" : "local";
     showMessage("已删除");
   } catch (error) {
+    console.error("deleteTask failed", error);
     state.tasks = previousTasks;
     state.taskVersions = previousVersions;
     state.confirmingDeleteTaskId = "";

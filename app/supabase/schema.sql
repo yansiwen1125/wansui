@@ -1,6 +1,8 @@
 -- 万岁 Supabase Schema / Migration
 -- 可重复执行：用于从 V1 / V1.1 平滑升级到当前版本，不删除已有用户打卡数据。
 
+grant usage on schema public to anon;
+
 create table if not exists public.app_config (
   id smallint primary key check (id = 1),
   username text not null default 'ysw',
