@@ -132,8 +132,62 @@ export function normalizeTask(task, index = 0) {
   };
 }
 
+export function normalizeTasks(tasks = []) {
+  return tasks.map(normalizeTask).sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+}
+
 export function sortTasks(tasks) {
   return [...tasks].sort((a, b) => (a.sortOrder ?? 0) - (b.sortOrder ?? 0));
+}
+
+export function normalizeTaskVersion(version, index = 0) {
+  return {
+    effectiveDate: version.effectiveDate ?? version.effective_date ?? EFFECTIVE_START_DATE,
+    tasks: normalizeTasks(version.tasks ?? []),
+    updatedAt: version.updatedAt ?? version.updated_at ?? new Date().toISOString(),
+    index
+  };
+}
+
+export function normalizeTaskVersions(versions = []) {
+  return versions
+    .map(normalizeTaskVersion)
+    .sort((a, b) => a.effectiveDate.localeCompare(b.effectiveDate) || a.index - b.index)
+    .map(({ index, ...version }) => version);
+}
+
+export function createTaskVersion(effectiveDate, tasks) {
+  return {
+    effectiveDate,
+    tasks: normalizeTasks(tasks),
+    updatedAt: new Date().toISOString()
+  };
+}
+
+export function ensureInitialTaskVersion(versions = [], tasks = [], date = EFFECTIVE_START_DATE) {
+  const normalized = normalizeTaskVersions(versions);
+  if (normalized.length) return normalized;
+  return [createTaskVersion(date, tasks)];
+}
+
+export function taskVersionForDate(versions = [], date = todayKey(), fallbackTasks = []) {
+  const normalized = ensureInitialTaskVersion(versions, fallbackTasks);
+  let selected = null;
+  for (const version of normalized) {
+    if (version.effectiveDate <= date) selected = version;
+    else break;
+  }
+  return selected ?? normalized[0] ?? createTaskVersion(EFFECTIVE_START_DATE, fallbackTasks);
+}
+
+export function tasksForDate(versions = [], date = todayKey(), fallbackTasks = []) {
+  return normalizeTasks(taskVersionForDate(versions, date, fallbackTasks).tasks);
+}
+
+export function upsertTaskVersion(versions = [], effectiveDate = todayKey(), tasks = []) {
+  const version = createTaskVersion(effectiveDate, tasks);
+  const withoutToday = normalizeTaskVersions(versions).filter((item) => item.effectiveDate !== effectiveDate);
+  return normalizeTaskVersions([...withoutToday, version]);
 }
 
 export function applyTaskOrder(tasks, orderedIds) {
@@ -188,6 +242,14 @@ export function recordKey(taskId, date, username = "") {
 export function isCompleted(records, taskId, date, username = "") {
   return records.get(recordKey(taskId, date, username))?.completed === true
     || records.get(recordKey(taskId, date))?.completed === true;
+}
+
+export function hasCompletedRecord(records, taskId, username = "") {
+  return [...records.values()].some((record) => {
+    if (record.taskId !== taskId && record.task_id !== taskId) return false;
+    if (username && (record.username ?? username) !== username) return false;
+    return record.completed === true;
+  });
 }
 
 export function completionCount(records, date, tasks = DEFAULT_TASKS, username = "") {

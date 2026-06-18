@@ -1,4 +1,4 @@
-import { EFFECTIVE_START_DATE, LEGACY_USERNAME, normalizeTask } from "./domain.js";
+import { EFFECTIVE_START_DATE, LEGACY_USERNAME, normalizeTask, normalizeTaskVersions } from "./domain.js";
 
 const config = window.WANSUI_CONFIG ?? {};
 const enabled = Boolean(config.supabaseUrl && config.supabasePublishableKey);
@@ -49,7 +49,7 @@ export async function initializeCloud() {
       id: 1,
       username: LEGACY_USERNAME,
       effective_start_date: EFFECTIVE_START_DATE,
-      schema_version: 1,
+      schema_version: 12,
       last_known_time_zone: Intl.DateTimeFormat().resolvedOptions().timeZone
     })
   });
@@ -112,12 +112,43 @@ export async function saveTasksRemote(username = LEGACY_USERNAME, tasks = []) {
       hidden_periods: normalized.hiddenPeriods ?? []
     };
   });
+  if (!payload.length) return [];
   const result = await request("tasks?on_conflict=username,id", {
     method: "POST",
     headers: { Prefer: "resolution=merge-duplicates,return=representation" },
     body: JSON.stringify(payload)
   });
   return (result ?? []).map((task, index) => normalizeTask(task, index)).sort((a, b) => a.sortOrder - b.sortOrder);
+}
+
+export async function fetchTaskVersions(username = LEGACY_USERNAME) {
+  if (!enabled) return [];
+  const versions = await request(
+    `task_versions?username=eq.${encodeURIComponent(username)}&select=username,effective_date,tasks,updated_at&order=effective_date.asc`
+  );
+  return normalizeTaskVersions(versions ?? []);
+}
+
+export async function saveTaskVersionsRemote(username = LEGACY_USERNAME, versions = []) {
+  if (!enabled) return normalizeTaskVersions(versions);
+  await saveUser(username);
+  const payload = normalizeTaskVersions(versions).map((version) => ({
+    username,
+    effective_date: version.effectiveDate,
+    tasks: version.tasks
+  }));
+  if (!payload.length) return [];
+  const result = await request("task_versions?on_conflict=username,effective_date", {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=representation" },
+    body: JSON.stringify(payload)
+  });
+  return normalizeTaskVersions(result ?? []);
+}
+
+export async function saveTaskVersionRemote(username = LEGACY_USERNAME, version) {
+  const saved = await saveTaskVersionsRemote(username, [version]);
+  return saved.find((item) => item.effectiveDate === version.effectiveDate) ?? version;
 }
 
 export async function fetchRecords(username = LEGACY_USERNAME) {
@@ -131,6 +162,34 @@ export async function fetchRecords(username = LEGACY_USERNAME) {
     if (username !== LEGACY_USERNAME) throw error;
     return request(`checkins?date=gte.${EFFECTIVE_START_DATE}&select=${fields}`);
   }
+}
+
+export async function hasCompletedRecordRemote(username = LEGACY_USERNAME, taskId) {
+  if (!enabled) return false;
+  const usernameFilter = `username=eq.${encodeURIComponent(username)}&`;
+  const rows = await request(
+    `checkins?${usernameFilter}task_id=eq.${encodeURIComponent(taskId)}&completed=eq.true&select=task_id&limit=1`
+  ).catch((error) => {
+    if (username !== LEGACY_USERNAME) throw error;
+    return request(`checkins?task_id=eq.${encodeURIComponent(taskId)}&completed=eq.true&select=task_id&limit=1`);
+  });
+  return Boolean(rows?.length);
+}
+
+export async function deleteTaskRemote(username = LEGACY_USERNAME, taskId) {
+  if (!enabled) return;
+  const usernameFilter = `username=eq.${encodeURIComponent(username)}&`;
+  await request(
+    `checkins?${usernameFilter}task_id=eq.${encodeURIComponent(taskId)}&completed=eq.false`,
+    { method: "DELETE" }
+  ).catch((error) => {
+    if (username !== LEGACY_USERNAME) throw error;
+    return request(`checkins?task_id=eq.${encodeURIComponent(taskId)}&completed=eq.false`, { method: "DELETE" });
+  });
+  await request(
+    `tasks?${usernameFilter}id=eq.${encodeURIComponent(taskId)}`,
+    { method: "DELETE" }
+  );
 }
 
 export async function saveRecord(taskId, date, completed, username = LEGACY_USERNAME) {

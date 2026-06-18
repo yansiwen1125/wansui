@@ -1,4 +1,10 @@
-import { EFFECTIVE_START_DATE, LEGACY_USERNAME, createDefaultTasks, normalizeTask } from "./domain.js";
+import {
+  EFFECTIVE_START_DATE,
+  LEGACY_USERNAME,
+  createDefaultTasks,
+  normalizeTask,
+  normalizeTaskVersions
+} from "./domain.js";
 
 const DB_NAME = "wansui-v1";
 const STORE = "state";
@@ -80,6 +86,15 @@ export async function loadTasks(username) {
 
 export async function saveTasks(username, tasks) {
   await setValue(`tasks:${username}`, tasks.map(normalizeTask));
+}
+
+export async function loadTaskVersions(username) {
+  const versions = await getValue(`task-versions:v1.2:${username}`, []);
+  return normalizeTaskVersions(versions);
+}
+
+export async function saveTaskVersions(username, versions) {
+  await setValue(`task-versions:v1.2:${username}`, normalizeTaskVersions(versions));
 }
 
 export function currentUsername() {

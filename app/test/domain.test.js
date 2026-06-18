@@ -7,6 +7,7 @@ import {
   applyTaskOrder,
   completionCount,
   createDefaultTasks,
+  hasCompletedRecord,
   isTaskActiveOn,
   monthGrid,
   moveTaskToHiddenEnd,
@@ -15,7 +16,9 @@ import {
   recordKey,
   sortTasks,
   startOfWeek,
+  tasksForDate,
   taskStats,
+  upsertTaskVersion,
   validateUsername,
   weekKeys
 } from "../src/domain.js";
@@ -146,6 +149,42 @@ test("hidden and restored tasks move to the end of their current section", () =>
     tasks[3].id,
     tasks[1].id
   ]);
+});
+
+test("task edits only affect the effective date and later dates", () => {
+  const tasks = createDefaultTasks("2026-06-10");
+  const renamed = tasks.map((task) => task.id === tasks[0].id ? { ...task, name: "新名字" } : task);
+  const versions = upsertTaskVersion([{ effectiveDate: "2026-06-10", tasks }], "2026-06-18", renamed);
+  assert.equal(tasksForDate(versions, "2026-06-17")[0].name, tasks[0].name);
+  assert.equal(tasksForDate(versions, "2026-06-18")[0].name, "新名字");
+});
+
+test("restored task is visible at the end only from restore date", () => {
+  const tasks = createDefaultTasks("2026-06-10");
+  const hidden = moveTaskToHiddenEnd(tasks.map((task) => task.id === tasks[1].id
+    ? { ...task, hiddenPeriods: [{ start: "2026-06-16", end: null }] }
+    : task), tasks[1].id);
+  const restored = moveTaskToVisibleEnd(hidden.map((task) => task.id === tasks[1].id
+    ? { ...task, hiddenPeriods: [{ start: "2026-06-16", end: "2026-06-18" }] }
+    : task), tasks[1].id);
+  const versions = upsertTaskVersion(
+    upsertTaskVersion([{ effectiveDate: "2026-06-10", tasks }], "2026-06-16", hidden),
+    "2026-06-18",
+    restored
+  );
+  assert.equal(isTaskActiveOn(tasksForDate(versions, "2026-06-17").find((task) => task.id === tasks[1].id), "2026-06-17"), false);
+  assert.deepEqual(sortTasks(tasksForDate(versions, "2026-06-18")).map((task) => task.id), [
+    tasks[0].id,
+    tasks[2].id,
+    tasks[3].id,
+    tasks[1].id
+  ]);
+});
+
+test("only completed true records block permanent delete", () => {
+  const taskId = TASKS[0].id;
+  assert.equal(hasCompletedRecord(records([[taskId, "2026-06-16", false]]), taskId), false);
+  assert.equal(hasCompletedRecord(records([[taskId, "2026-06-16", true]]), taskId), true);
 });
 
 test("username validation accepts the v1.1 rule set", () => {

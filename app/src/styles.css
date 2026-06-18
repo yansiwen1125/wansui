@@ -1,6 +1,6 @@
 :root {
   --page: #faf9f6;
-  --outer: #edeae3;
+  --outer: #faf9f6;
   --card: #fff;
   --text: #252522;
   --muted: #77756f;
@@ -173,13 +173,15 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--text); outl
 .edit-header h1 { margin: 0; font-size: clamp(25px, 7vw, 31px); }
 .edit-tip, .edit-warning { color: var(--muted); font-size: 13px; margin: 0 0 14px; }
 .edit-list { display: grid; gap: 12px; margin-top: 10px; }
-.edit-row { min-height: 68px; border: 1.5px solid var(--gray); border-radius: 20px; background: #fff; display: grid; grid-template-columns: 34px 12px 1fr 34px 34px; gap: 12px; align-items: center; padding: 0 13px; }
+.edit-row { min-height: 68px; border: 1.5px solid var(--gray); border-radius: 20px; background: #fff; display: grid; grid-template-columns: 34px 12px minmax(0, 1fr) auto; gap: 12px; align-items: center; padding: 0 13px; }
 .edit-list.sorting .edit-row { transition: transform .12s ease, box-shadow .12s ease, opacity .12s ease; }
 .edit-row.dragging { opacity: .9; border-color: var(--text); box-shadow: 0 12px 24px rgba(83,75,63,.14); transform: scale(1.015); }
 .edit-row > i { width: 12px; height: 36px; border-radius: 6px; background: var(--task-color); }
 .edit-row strong { font-size: 18px; }
 .edit-row.hidden-row { grid-template-columns: 12px 1fr 34px; background: #f7f5f0; color: var(--muted); margin-top: 12px; }
+.edit-actions { display: flex; gap: 10px; align-items: center; justify-content: flex-end; }
 .icon-button { width: 34px; height: 34px; border: 0; border-radius: 12px; background: #eeeae3; display: grid; place-items: center; color: var(--muted); }
+.icon-button.danger { color: #9a6b52; }
 .icon-button.drag { background: none; color: var(--weak); cursor: grab; touch-action: none; }
 .icon-button.drag:active { cursor: grabbing; }
 .icon-button:disabled { opacity: .3; }
@@ -197,6 +199,15 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--text); outl
 .palette { display: grid; grid-template-columns: repeat(8, minmax(0, 1fr)); justify-content: stretch; gap: 10px; padding: 18px; border-radius: 22px; background: #fff; border: 1.5px solid var(--gray); }
 .palette button { width: 100%; aspect-ratio: 1; border: 2px solid transparent; border-radius: 10px; background: var(--task-color); }
 .palette button.selected { border-color: var(--text); outline: 3px solid #fff; box-shadow: 0 0 0 2px var(--text); }
+.dialog-backdrop { position: fixed; z-index: 30; inset: 0; background: rgba(37,37,34,.18); display: grid; place-items: center; padding: 24px; }
+.confirm-dialog { width: min(100%, 380px); background: #fff; border-radius: 32px; padding: 36px 27px 36px; text-align: center; box-shadow: 0 24px 60px rgba(83,75,63,.20); }
+.dialog-icon { width: 54px; height: 54px; margin: 0 auto 20px; border-radius: 18px; background: #eee7e2; color: #a9795b; display: grid; place-items: center; }
+.dialog-icon svg { width: 28px; height: 28px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; transform: translateY(-1px); }
+.confirm-dialog h2 { margin: 0 0 16px; font-size: 26px; }
+.confirm-dialog p { margin: 0; color: var(--muted); font-size: 15px; line-height: 1.75; }
+.confirm-dialog > div:last-child { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; margin-top: 28px; }
+.confirm-dialog button { height: 50px; border: 0; border-radius: 16px; font-weight: 700; background: #eeeae3; }
+.confirm-dialog button:last-child { background: var(--text); color: #fff; }
 
 @media (min-width: 481px) {
   .screen { min-height: 900px; margin-block: 24px; border-radius: 44px; overflow: hidden; box-shadow: 0 14px 38px rgba(83,75,63,.10); }

@@ -9,10 +9,13 @@ import {
   addDays,
   addMonths,
   completionCount,
-  completionRate,
+  createTaskVersion,
   createDefaultTasks,
   dateLabel,
   dotMonth,
+  endOfMonth,
+  hasCompletedRecord,
+  ensureInitialTaskVersion,
   fromDateKey,
   hiddenTasks,
   isCompleted,
@@ -24,23 +27,28 @@ import {
   moveTaskToVisibleEnd,
   normalizeTask,
   normalizeUsername,
-  overviewStats,
   recordKey,
   sortTasks,
   startOfMonth,
-  taskStats,
+  tasksForDate,
   todayKey,
+  upsertTaskVersion,
   validateUsername,
   visibleTasks,
   weekKeys
 } from "./domain.js";
 import {
   cloudEnabled,
+  deleteTaskRemote,
   fetchRecords,
   fetchTasks,
+  fetchTaskVersions,
   fetchUsers,
+  hasCompletedRecordRemote,
   initializeCloud,
   saveRecord,
+  saveTaskVersionRemote,
+  saveTaskVersionsRemote,
   saveTasksRemote,
   saveUser
 } from "./api.js";
@@ -49,10 +57,12 @@ import {
   ensureLegacyUser,
   isLoggedIn,
   loadCache,
+  loadTaskVersions,
   loadTasks,
   loadUsers,
   logout,
   saveCache,
+  saveTaskVersions,
   saveTasks,
   saveUsers,
   setLoggedIn
@@ -64,6 +74,7 @@ const state = {
   username: currentUsername(),
   users: [],
   tasks: [],
+  taskVersions: [],
   selectedDate: todayKey(),
   month: startOfMonth(todayKey()),
   records: new Map(),
@@ -74,20 +85,25 @@ const state = {
   cloudStatus: cloudEnabled() ? "syncing" : "local",
   taskMonths: {},
   editingTaskId: "",
+  confirmingDeleteTaskId: "",
   hiddenExpanded: false,
   formError: ""
 };
 
+function tasksAt(date = state.selectedDate) {
+  return tasksForDate(state.taskVersions, date, state.tasks);
+}
+
 function currentTasks(date = state.selectedDate) {
-  return activeTasks(state.tasks, date);
+  return activeTasks(tasksAt(date), date);
 }
 
 function currentVisibleTasks() {
-  return visibleTasks(state.tasks);
+  return visibleTasks(tasksAt(todayKey()));
 }
 
 function currentHiddenTasks() {
-  return hiddenTasks(state.tasks);
+  return hiddenTasks(tasksAt(todayKey()));
 }
 
 function recordArray() {
@@ -117,10 +133,81 @@ function loadRecordArray(records) {
   );
 }
 
+function completionCountAt(date) {
+  return currentTasks(date).filter((task) => isCompleted(state.records, task.id, date, state.username)).length;
+}
+
+function completionRateAt(date) {
+  const tasks = currentTasks(date);
+  return tasks.length ? completionCountAt(date) / tasks.length : 0;
+}
+
+function overviewStatsAt(monthKey = todayKey(), today = todayKey()) {
+  const start = [startOfMonth(monthKey), EFFECTIVE_START_DATE].sort().at(-1);
+  const end = [endOfMonth(monthKey), today].sort()[0];
+  const dates = [];
+  for (let date = start; date <= end; date = addDays(date, 1)) {
+    if (date.slice(0, 7) !== monthKey.slice(0, 7)) break;
+    dates.push(date);
+  }
+  let possible = 0;
+  const totalCheckins = dates.reduce((sum, date) => {
+    possible += currentTasks(date).length;
+    return sum + completionCountAt(date);
+  }, 0);
+  return {
+    greenDays: dates.filter((date) => completionRateAt(date) >= 0.5).length,
+    totalRate: possible ? Math.round((totalCheckins / possible) * 100) : 0,
+    totalCheckins
+  };
+}
+
+function taskStatsAt(taskId, monthKey = todayKey(), today = todayKey()) {
+  const start = [startOfMonth(monthKey), EFFECTIVE_START_DATE].sort().at(-1);
+  const month = monthKey.slice(0, 7);
+  const monthDays = [];
+  for (let date = start; date <= today && date.slice(0, 7) === month; date = addDays(date, 1)) {
+    if (currentTasks(date).some((task) => task.id === taskId)) monthDays.push(date);
+  }
+  const monthCount = monthDays.filter((date) => isCompleted(state.records, taskId, date, state.username)).length;
+  const currentStart = isCompleted(state.records, taskId, today, state.username) ? today : addDays(today, -1);
+  let currentStreak = 0;
+  if (currentStart >= EFFECTIVE_START_DATE && isCompleted(state.records, taskId, currentStart, state.username)) {
+    for (let date = currentStart; date >= EFFECTIVE_START_DATE; date = addDays(date, -1)) {
+      if (!currentTasks(date).some((task) => task.id === taskId)) break;
+      if (!isCompleted(state.records, taskId, date, state.username)) break;
+      currentStreak += 1;
+    }
+  }
+  let longestStreak = 0;
+  let run = 0;
+  for (let date = EFFECTIVE_START_DATE; date <= today; date = addDays(date, 1)) {
+    if (!currentTasks(date).some((task) => task.id === taskId)) {
+      run = 0;
+    } else if (isCompleted(state.records, taskId, date, state.username)) {
+      run += 1;
+      longestStreak = Math.max(longestStreak, run);
+    } else {
+      run = 0;
+    }
+  }
+  return {
+    monthRate: monthDays.length ? Math.round((monthCount / monthDays.length) * 100) : 0,
+    monthCount,
+    currentStreak,
+    longestStreak
+  };
+}
+
+function canDeleteTask(taskId) {
+  return !hasCompletedRecord(state.records, taskId, state.username);
+}
+
 function icon(name) {
   if (name === "home") return `<svg viewBox="0 0 24 24"><path d="M3 11 12 3l9 8v10h-6v-7H9v7H3z"/></svg>`;
   if (name === "records") return `<svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="5"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>`;
   if (name === "edit") return `<svg viewBox="0 0 24 24"><path d="M5 19l4-.8L19 8.2 15.8 5 5.8 15z"/><path d="M14.5 6.5l3 3"/></svg>`;
+  if (name === "delete") return `<svg viewBox="0 0 24 24"><path d="M6 7h12"/><path d="M9 7V5h6v2"/><path d="M8 10l1 9h6l1-9"/></svg>`;
   if (name === "hide") return `<svg viewBox="0 0 24 24"><path d="M3 12s4-6 9-6 9 6 9 6-4 6-9 6-9-6-9-6z"/><path d="M4 20 20 4"/></svg>`;
   if (name === "show") return `<svg viewBox="0 0 24 24"><path d="M3 12s4-6 9-6 9 6 9 6-4 6-9 6-9-6-9-6z"/><circle cx="12" cy="12" r="3"/></svg>`;
   if (name === "drag") return `<svg viewBox="0 0 24 24"><circle cx="8" cy="6" r="1.5"/><circle cx="16" cy="6" r="1.5"/><circle cx="8" cy="12" r="1.5"/><circle cx="16" cy="12" r="1.5"/><circle cx="8" cy="18" r="1.5"/><circle cx="16" cy="18" r="1.5"/></svg>`;
@@ -189,7 +276,7 @@ function renderLogin() {
         <button class="text-link register-link" data-route="register"><span>还没有用户名？</span><strong>去注册</strong></button>
         <aside class="login-note compact">
           <strong>＋</strong>
-          <div><b>V1.1 · 多用户版本</b><span>输入已注册用户名即可进入</span><span>未注册会跳转到注册页</span></div>
+          <div><b>V1.2 · 任务编辑修正版</b><span>输入已注册用户名即可进入</span><span>未注册会跳转到注册页</span></div>
         </aside>
       </section>
     </main>`;
@@ -218,7 +305,7 @@ function renderRegister() {
 function renderHome() {
   const today = todayKey();
   const tasks = currentTasks(state.selectedDate);
-  const completed = completionCount(state.records, state.selectedDate, state.tasks, state.username);
+  const completed = completionCountAt(state.selectedDate);
   const days = weekKeys(state.selectedDate);
   app.innerHTML = `
     <main class="screen app-screen">
@@ -284,7 +371,7 @@ function renderMonth() {
         <div class="calendar-grid">
           ${cells.map((cell) => {
             const future = cell.key > today;
-            const highlighted = cell.inMonth && !future && completionRate(state.records, cell.key, state.tasks, state.username) >= 0.5;
+            const highlighted = cell.inMonth && !future && completionRateAt(cell.key) >= 0.5;
             const classes = [
               cell.inMonth ? "" : "outside",
               future ? "future" : "",
@@ -305,10 +392,11 @@ function renderDotCalendar(task, monthKey) {
     <strong>${monthLabel(monthKey, false)}</strong>
     <div class="dot-grid">
       ${dotMonth(monthKey).map((cell) => {
-        const color = cell.hidden || !isTaskActiveOn(task, cell.key)
+        const taskAtDate = tasksAt(cell.key).find((item) => item.id === task.id);
+        const color = cell.hidden || !taskAtDate || !isTaskActiveOn(taskAtDate, cell.key)
           ? "outside"
           : isCompleted(state.records, task.id, cell.key, state.username) ? "done" : "empty";
-        return `<i class="${color} ${cell.key === today ? "today" : ""}" style="--task-color:${task.color}"></i>`;
+        return `<i class="${color} ${cell.key === today ? "today" : ""}" style="--task-color:${taskAtDate?.color ?? task.color}"></i>`;
       }).join("")}
     </div>
   </div>`;
@@ -317,7 +405,7 @@ function renderDotCalendar(task, monthKey) {
 function taskRecordArticle(task, muted = false) {
   const latest = state.taskMonths[task.id] ?? startOfMonth(todayKey());
   const months = [addMonths(latest, -2), addMonths(latest, -1), latest];
-  const stats = taskStats(state.records, task.id, latest, todayKey(), state.tasks, state.username);
+  const stats = taskStatsAt(task.id, latest, todayKey());
   return `<article class="task-record ${muted ? "hidden-record" : ""}">
     <header><i style="background:${task.color}"></i><h2>${task.name}</h2><span>${muted ? "已隐藏" : fromDateKey(latest).getFullYear()}</span></header>
     <div class="month-window">
@@ -335,7 +423,7 @@ function taskRecordArticle(task, muted = false) {
 }
 
 function renderTasks() {
-  const summary = overviewStats(state.records, state.month, todayKey(), state.tasks, state.username);
+  const summary = overviewStatsAt(state.month, todayKey());
   const visible = currentVisibleTasks();
   const hidden = currentHiddenTasks();
   app.innerHTML = `
@@ -373,8 +461,11 @@ function renderEdit() {
         ${visible.map((task) => `<div class="edit-row" style="--task-color:${task.color}" data-edit-row="${task.id}">
           <button data-drag-handle="${task.id}" class="icon-button drag" aria-label="拖动排序">${icon("drag")}</button>
           <i></i><strong>${task.name}</strong>
-          <button data-edit-task="${task.id}" class="icon-button">${icon("edit")}</button>
-          <button data-hide-task="${task.id}" class="icon-button">${icon("hide")}</button>
+          <span class="edit-actions">
+            ${canDeleteTask(task.id) ? `<button data-delete-task="${task.id}" class="icon-button danger" aria-label="删除">${icon("delete")}</button>` : ""}
+            <button data-edit-task="${task.id}" class="icon-button">${icon("edit")}</button>
+            <button data-hide-task="${task.id}" class="icon-button">${icon("hide")}</button>
+          </span>
         </div>`).join("")}
       </section>
       <button class="add-task-button" data-route="new-task" ${canAdd ? "" : "disabled"}>＋ 新增打卡事件</button>
@@ -387,11 +478,26 @@ function renderEdit() {
         </div>`).join("") : ""}
       </section>` : ""}
       ${state.message ? `<div class="toast">${state.message}</div>` : ""}
+      ${state.confirmingDeleteTaskId ? deleteDialog() : ""}
     </main>`;
 }
 
+function deleteDialog() {
+  return `<div class="dialog-backdrop">
+    <section class="confirm-dialog" role="dialog" aria-modal="true">
+      <div class="dialog-icon">${icon("delete")}</div>
+      <h2>删除这个打卡事件？</h2>
+      <p>它还没有完成过打卡。<br>删除后会从本机和云端彻底移除，<br>无法恢复。</p>
+      <div>
+        <button data-cancel-delete>取消</button>
+        <button data-confirm-delete>删除</button>
+      </div>
+    </section>
+  </div>`;
+}
+
 function renderTaskForm(mode) {
-  const task = state.tasks.find((item) => item.id === state.editingTaskId);
+  const task = tasksAt(todayKey()).find((item) => item.id === state.editingTaskId);
   const editing = mode === "edit-task" && task;
   const title = editing ? "编辑打卡事件" : "新增打卡事件";
   const name = editing ? task.name : "";
@@ -483,6 +589,7 @@ function bindEvents() {
     logout();
     state.username = "";
     state.tasks = [];
+    state.taskVersions = [];
     state.records = new Map();
     state.route = "login";
     state.formError = "";
@@ -540,10 +647,13 @@ function bindEvents() {
     users.push({ username, createdAt });
     await saveUsers(users);
     const defaultTasks = createDefaultTasks(todayKey());
+    const defaultVersions = [createTaskVersion(todayKey(), defaultTasks)];
     await saveTasks(username, defaultTasks);
+    await saveTaskVersions(username, defaultVersions);
     if (cloudEnabled() && navigator.onLine) {
       try {
         await saveUser(username, createdAt);
+        await saveTaskVersionsRemote(username, defaultVersions);
         await saveTasksRemote(username, defaultTasks);
         state.cloudStatus = "synced";
       } catch {
@@ -600,6 +710,20 @@ function bindEvents() {
     button.addEventListener("click", () => restoreTask(button.dataset.restoreTask));
   });
 
+  document.querySelectorAll("[data-delete-task]").forEach((button) => {
+    button.addEventListener("click", () => {
+      state.confirmingDeleteTaskId = button.dataset.deleteTask;
+      render();
+    });
+  });
+
+  document.querySelector("[data-cancel-delete]")?.addEventListener("click", () => {
+    state.confirmingDeleteTaskId = "";
+    render();
+  });
+
+  document.querySelector("[data-confirm-delete]")?.addEventListener("click", () => deleteTask(state.confirmingDeleteTaskId));
+
   bindDragSorting();
 
   document.querySelectorAll("[data-color]").forEach((button) => {
@@ -635,6 +759,13 @@ async function ensureUserState() {
     state.tasks = createDefaultTasks(state.username === LEGACY_USERNAME ? EFFECTIVE_START_DATE : todayKey());
     await saveTasks(state.username, state.tasks);
   }
+  state.taskVersions = ensureInitialTaskVersion(
+    await loadTaskVersions(state.username),
+    state.tasks,
+    state.username === LEGACY_USERNAME ? EFFECTIVE_START_DATE : todayKey()
+  );
+  state.tasks = tasksAt(todayKey());
+  await saveTaskVersions(state.username, state.taskVersions);
   for (const task of state.tasks) {
     if (!state.taskMonths[task.id]) state.taskMonths[task.id] = startOfMonth(todayKey());
   }
@@ -678,24 +809,42 @@ async function toggleTask(taskId) {
   }
 }
 
-async function persistTasks() {
-  state.tasks = sortTasks(state.tasks).map((task, index) => ({ ...task, sortOrder: index + 1, updatedAt: new Date().toISOString() }));
-  await saveTasks(state.username, state.tasks);
-  if (cloudEnabled() && navigator.onLine) {
-    try {
+async function persistTasks(previousTasks = state.tasks, previousVersions = state.taskVersions) {
+  const today = todayKey();
+  const normalized = sortTasks(state.tasks).map((task, index) => ({ ...task, sortOrder: index + 1, updatedAt: new Date().toISOString() }));
+  const nextVersions = upsertTaskVersion(state.taskVersions, today, normalized);
+  const version = createTaskVersion(today, normalized);
+  const rollback = async () => {
+    state.tasks = previousTasks;
+    state.taskVersions = previousVersions;
+    await saveTasks(state.username, previousTasks);
+    await saveTaskVersions(state.username, previousVersions);
+    state.cloudStatus = "local";
+  };
+  if (cloudEnabled() && !navigator.onLine) {
+    await rollback();
+    showMessage("网络不可用，暂时不能保存");
+    return false;
+  }
+  try {
+    if (cloudEnabled()) {
       await ensureRemoteCurrentUser();
-      const saved = await saveTasksRemote(state.username, state.tasks);
-      if (saved.length) {
-        state.tasks = saved.map((task, index) => normalizeTask(task, index));
-        for (const task of state.tasks) {
-          if (!state.taskMonths[task.id]) state.taskMonths[task.id] = startOfMonth(todayKey());
-        }
-      }
-      state.cloudStatus = "synced";
-    } catch {
-      state.cloudStatus = "local";
-      showMessage("已存本机，待同步");
+      await saveTasksRemote(state.username, normalized);
+      await saveTaskVersionRemote(state.username, version);
     }
+    state.tasks = normalized;
+    state.taskVersions = nextVersions;
+    await saveTasks(state.username, state.tasks);
+    await saveTaskVersions(state.username, state.taskVersions);
+    for (const task of state.tasks) {
+      if (!state.taskMonths[task.id]) state.taskMonths[task.id] = startOfMonth(todayKey());
+    }
+    state.cloudStatus = cloudEnabled() ? "synced" : "local";
+    return true;
+  } catch {
+    await rollback();
+    showMessage("保存失败，请稍后重试");
+    return false;
   }
 }
 
@@ -704,12 +853,14 @@ async function moveTask(taskId, direction) {
   const index = visible.findIndex((task) => task.id === taskId);
   const targetIndex = index + direction;
   if (index < 0 || targetIndex < 0 || targetIndex >= visible.length) return;
+  const previousTasks = tasksAt(todayKey());
+  const previousVersions = state.taskVersions;
   const ordered = [...visible];
   const [task] = ordered.splice(index, 1);
   ordered.splice(targetIndex, 0, task);
   const hidden = currentHiddenTasks();
-  state.tasks = applyTaskOrder(state.tasks, [...ordered, ...hidden].map((item) => item.id));
-  await persistTasks();
+  state.tasks = applyTaskOrder(previousTasks, [...ordered, ...hidden].map((item) => item.id));
+  await persistTasks(previousTasks, previousVersions);
   render();
 }
 
@@ -718,11 +869,15 @@ function bindDragSorting() {
   if (!list) return;
   let draggingId = "";
   let pointerId = null;
+  let dragStartTasks = [];
+  let dragStartVersions = [];
 
   document.querySelectorAll("[data-drag-handle]").forEach((handle) => {
     handle.addEventListener("pointerdown", (event) => {
       draggingId = handle.dataset.dragHandle;
       pointerId = event.pointerId;
+      dragStartTasks = tasksAt(todayKey());
+      dragStartVersions = state.taskVersions;
       handle.setPointerCapture?.(pointerId);
       list.classList.add("sorting");
       rowById(draggingId)?.classList.add("dragging");
@@ -745,13 +900,19 @@ function bindDragSorting() {
       if (!draggingId || event.pointerId !== pointerId) return;
       draggingId = "";
       pointerId = null;
-      await persistTasks();
+      await persistTasks(dragStartTasks, dragStartVersions);
+      dragStartTasks = [];
+      dragStartVersions = [];
       render();
     });
 
     handle.addEventListener("pointercancel", () => {
       draggingId = "";
       pointerId = null;
+      state.tasks = dragStartTasks.length ? dragStartTasks : state.tasks;
+      state.taskVersions = dragStartVersions.length ? dragStartVersions : state.taskVersions;
+      dragStartTasks = [];
+      dragStartVersions = [];
       render();
     });
   });
@@ -763,26 +924,31 @@ function rowById(taskId) {
 
 function syncTaskOrderFromRows() {
   const orderedIds = [...document.querySelectorAll(".edit-list [data-edit-row]")].map((row) => row.dataset.editRow);
-  const visible = orderedIds.map((id) => state.tasks.find((task) => task.id === id)).filter(Boolean);
+  const todayTasks = tasksAt(todayKey());
+  const visible = orderedIds.map((id) => todayTasks.find((task) => task.id === id)).filter(Boolean);
   const hidden = currentHiddenTasks();
-  state.tasks = applyTaskOrder(state.tasks, [...visible, ...hidden].map((item) => item.id));
+  state.tasks = applyTaskOrder(todayTasks, [...visible, ...hidden].map((item) => item.id));
 }
 
 async function hideTask(taskId) {
   const today = todayKey();
-  state.tasks = state.tasks.map((task) => {
+  const previousTasks = tasksAt(today);
+  const previousVersions = state.taskVersions;
+  state.tasks = previousTasks.map((task) => {
     if (task.id !== taskId) return task;
     if ((task.hiddenPeriods ?? []).some((period) => !period.end)) return task;
     return { ...task, hiddenPeriods: [...(task.hiddenPeriods ?? []), { start: today, end: null }] };
   });
   state.tasks = moveTaskToHiddenEnd(state.tasks, taskId);
-  await persistTasks();
+  await persistTasks(previousTasks, previousVersions);
   render();
 }
 
 async function restoreTask(taskId) {
   const today = todayKey();
-  state.tasks = state.tasks.map((task) => {
+  const previousTasks = tasksAt(today);
+  const previousVersions = state.taskVersions;
+  state.tasks = previousTasks.map((task) => {
     if (task.id !== taskId) return task;
     return {
       ...task,
@@ -790,8 +956,8 @@ async function restoreTask(taskId) {
     };
   });
   state.tasks = moveTaskToVisibleEnd(state.tasks, taskId);
-  await persistTasks();
-  state.hiddenExpanded = false;
+  const saved = await persistTasks(previousTasks, previousVersions);
+  if (saved) state.hiddenExpanded = false;
   render();
 }
 
@@ -808,8 +974,10 @@ async function saveTaskForm(form) {
     render();
     return;
   }
+  const previousTasks = tasksAt(todayKey());
+  const previousVersions = state.taskVersions;
   if (state.route === "edit-task") {
-    state.tasks = state.tasks.map((task) => task.id === state.editingTaskId ? { ...task, name, color } : task);
+    state.tasks = previousTasks.map((task) => task.id === state.editingTaskId ? { ...task, name, color } : task);
   } else {
     if (currentVisibleTasks().length >= 9) {
       state.formError = "最多只能同时显示 9 个打卡事件";
@@ -825,12 +993,70 @@ async function saveTaskForm(form) {
       hiddenPeriods: [],
       updatedAt: new Date().toISOString()
     };
-    state.tasks.push(task);
+    state.tasks = [...previousTasks, task];
     state.tasks = moveTaskToVisibleEnd(state.tasks, task.id);
   }
-  await persistTasks();
-  state.formError = "";
-  state.route = "edit";
+  const saved = await persistTasks(previousTasks, previousVersions);
+  if (saved) {
+    state.formError = "";
+    state.route = "edit";
+  }
+  render();
+}
+
+async function deleteTask(taskId) {
+  if (!taskId) return;
+  const today = todayKey();
+  const previousTasks = tasksAt(today);
+  const previousVersions = state.taskVersions;
+  if (!previousTasks.some((task) => task.id === taskId)) {
+    state.confirmingDeleteTaskId = "";
+    render();
+    return;
+  }
+  if (hasCompletedRecord(state.records, taskId, state.username)) {
+    state.confirmingDeleteTaskId = "";
+    showMessage("已有打卡记录，不能删除");
+    return;
+  }
+  if (cloudEnabled() && !navigator.onLine) {
+    state.confirmingDeleteTaskId = "";
+    showMessage("网络不可用，暂时不能删除");
+    return;
+  }
+  const nextTasks = sortTasks(previousTasks.filter((task) => task.id !== taskId))
+    .map((task, index) => ({ ...task, sortOrder: index + 1, updatedAt: new Date().toISOString() }));
+  const nextVersions = upsertTaskVersion(previousVersions, today, nextTasks);
+  const version = createTaskVersion(today, nextTasks);
+  try {
+    if (cloudEnabled()) {
+      await ensureRemoteCurrentUser();
+      if (await hasCompletedRecordRemote(state.username, taskId)) {
+        throw new Error("已有打卡记录，不能删除");
+      }
+      await deleteTaskRemote(state.username, taskId);
+      await saveTasksRemote(state.username, nextTasks);
+      await saveTaskVersionRemote(state.username, version);
+    }
+    state.tasks = nextTasks;
+    state.taskVersions = nextVersions;
+    for (const [key, record] of state.records.entries()) {
+      if ((record.username ?? state.username) === state.username && record.taskId === taskId && record.completed !== true) {
+        state.records.delete(key);
+      }
+    }
+    await saveTasks(state.username, state.tasks);
+    await saveTaskVersions(state.username, state.taskVersions);
+    await saveCache(state.username, currentUserRecords());
+    state.confirmingDeleteTaskId = "";
+    state.cloudStatus = cloudEnabled() ? "synced" : "local";
+    showMessage("已删除");
+  } catch (error) {
+    state.tasks = previousTasks;
+    state.taskVersions = previousVersions;
+    state.confirmingDeleteTaskId = "";
+    showMessage(error.message || "删除失败，请稍后重试");
+  }
   render();
 }
 
@@ -869,11 +1095,30 @@ async function syncFromCloud() {
     } catch (error) {
       if (state.username !== LEGACY_USERNAME) throw error;
     }
-    if (remoteTasks.length) {
-      state.tasks = remoteTasks.map((task, index) => normalizeTask(task, index));
+    let remoteVersions = [];
+    try {
+      remoteVersions = await fetchTaskVersions(state.username);
+    } catch (error) {
+      if (state.username !== LEGACY_USERNAME) throw error;
+    }
+    if (remoteVersions.length) {
+      state.taskVersions = remoteVersions;
+      state.tasks = tasksAt(todayKey());
+      await saveTaskVersions(state.username, state.taskVersions);
       await saveTasks(state.username, state.tasks);
+    } else if (remoteTasks.length) {
+      state.tasks = remoteTasks.map((task, index) => normalizeTask(task, index));
+      state.taskVersions = ensureInitialTaskVersion(state.taskVersions, state.tasks, state.username === LEGACY_USERNAME ? EFFECTIVE_START_DATE : (state.tasks[0]?.createdDate ?? todayKey()));
+      await saveTasks(state.username, state.tasks);
+      await saveTaskVersions(state.username, state.taskVersions);
+      try {
+        await saveTaskVersionsRemote(state.username, state.taskVersions);
+      } catch (error) {
+        if (state.username !== LEGACY_USERNAME) throw error;
+      }
     } else if (state.tasks.length) {
       try {
+        await saveTaskVersionsRemote(state.username, state.taskVersions);
         const savedTasks = await saveTasksRemote(state.username, state.tasks);
         if (savedTasks.length) state.tasks = savedTasks.map((task, index) => normalizeTask(task, index));
       } catch (error) {
