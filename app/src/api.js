@@ -7,9 +7,11 @@ const baseUrl = (config.supabaseUrl || "").replace(/\/rest\/v1\/?$/, "").replace
 function headers(extra = {}, hasBody = false) {
   const result = {
     apikey: config.supabasePublishableKey,
-    Authorization: `Bearer ${config.supabasePublishableKey}`,
     ...extra
   };
+  if (!String(config.supabasePublishableKey).startsWith("sb_publishable_")) {
+    result.Authorization = `Bearer ${config.supabasePublishableKey}`;
+  }
   if (hasBody) result["Content-Type"] = "application/json";
   return result;
 }
