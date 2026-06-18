@@ -4,23 +4,31 @@ const config = window.WANSUI_CONFIG ?? {};
 const enabled = Boolean(config.supabaseUrl && config.supabasePublishableKey);
 const baseUrl = (config.supabaseUrl || "").replace(/\/rest\/v1\/?$/, "").replace(/\/+$/, "");
 
-function headers(extra = {}, hasBody = false) {
+function headers(extra = {}, hasBody = false, forceAuthorization = false) {
   const result = {
     apikey: config.supabasePublishableKey,
     ...extra
   };
-  if (!String(config.supabasePublishableKey).startsWith("sb_publishable_")) {
+  if (forceAuthorization || !String(config.supabasePublishableKey).startsWith("sb_publishable_")) {
     result.Authorization = `Bearer ${config.supabasePublishableKey}`;
   }
   if (hasBody) result["Content-Type"] = "application/json";
   return result;
 }
 
-async function request(path, options = {}) {
+async function performRequest(path, options = {}, forceAuthorization = false) {
   const response = await fetch(`${baseUrl}/rest/v1/${path}`, {
     ...options,
-    headers: headers(options.headers, Boolean(options.body))
+    headers: headers(options.headers, Boolean(options.body), forceAuthorization)
   });
+  return response;
+}
+
+async function request(path, options = {}) {
+  let response = await performRequest(path, options);
+  if (response.status === 401 && String(config.supabasePublishableKey).startsWith("sb_publishable_")) {
+    response = await performRequest(path, options, true);
+  }
   if (!response.ok) {
     let detail = "";
     try {

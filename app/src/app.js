@@ -36,7 +36,7 @@ import {
   validateUsername,
   visibleTasks,
   weekKeys
-} from "./domain.js";
+} from "./domain.js?v=1.2.3";
 import {
   cloudEnabled,
   deleteTaskRemote,
@@ -51,7 +51,7 @@ import {
   saveTaskVersionsRemote,
   saveTasksRemote,
   saveUser
-} from "./api.js";
+} from "./api.js?v=1.2.3";
 import {
   currentUsername,
   ensureLegacyUser,
@@ -66,7 +66,7 @@ import {
   saveTasks,
   saveUsers,
   setLoggedIn
-} from "./storage.js";
+} from "./storage.js?v=1.2.3";
 
 const app = document.querySelector("#app");
 const state = {
