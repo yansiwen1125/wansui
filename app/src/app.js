@@ -37,7 +37,7 @@ import {
   validateUsername,
   visibleTasks,
   weekKeys
-} from "./domain.js?v=2.0.12";
+} from "./domain.js?v=2.0.13";
 import {
   cloudEnabled,
   deleteTaskRemote,
@@ -56,8 +56,8 @@ import {
   saveUserProfileRemote,
   saveTasksRemote,
   saveUser
-} from "./api.js?v=2.0.12";
-import { READING_ALGORITHM_VERSION, generateDailyReading, normalizeDailyReading } from "./reading.js?v=2.0.12";
+} from "./api.js?v=2.0.13";
+import { READING_ALGORITHM_VERSION, generateDailyReading, normalizeDailyReading } from "./reading.js?v=2.0.13";
 import {
   currentUsername,
   ensureLegacyUser,
@@ -76,9 +76,10 @@ import {
   saveUserProfile,
   saveUsers,
   setLoggedIn
-} from "./storage.js?v=2.0.12";
+} from "./storage.js?v=2.0.13";
 
 const app = document.querySelector("#app");
+const CLOUD_SYNC_TIMEOUT_MS = 12000;
 const state = {
   route: isLoggedIn() ? "home" : "login",
   username: currentUsername(),
@@ -1485,10 +1486,26 @@ function showMessage(message) {
   }, 2200);
 }
 
+function withTimeout(promise, ms, message) {
+  let timeoutId;
+  const timeout = new Promise((_, reject) => {
+    timeoutId = window.setTimeout(() => reject(new Error(message)), ms);
+  });
+  return Promise.race([promise, timeout]).finally(() => window.clearTimeout(timeoutId));
+}
+
 async function syncFromCloud() {
-  await ensureUserState();
-  const cached = await loadCache(state.username);
-  if (cached.length) loadRecordArray(cached);
+  try {
+    await ensureUserState();
+    const cached = await loadCache(state.username);
+    if (cached.length) loadRecordArray(cached);
+  } catch (error) {
+    console.warn("local state load failed", error);
+    state.loading = false;
+    state.cloudStatus = "local";
+    showMessage("本机数据读取失败，请刷新后重试");
+    return;
+  }
   state.loading = false;
   state.cloudStatus = cloudEnabled() ? "syncing" : "local";
   render();
@@ -1498,79 +1515,83 @@ async function syncFromCloud() {
     return;
   }
   try {
-    await initializeCloud();
-    try {
-      await refreshUsersFromCloud();
-    } catch (error) {
-      if (state.username !== LEGACY_USERNAME) throw error;
-    }
-    await ensureRemoteCurrentUser();
-    try {
-      const remoteProfile = await fetchUserProfile(state.username);
-      if (remoteProfile) {
-        state.userProfile = remoteProfile;
-        await saveUserProfile(state.username, remoteProfile);
-      } else if (state.userProfile) {
-        state.userProfile = await saveUserProfileRemote(state.username, state.userProfile);
-        await saveUserProfile(state.username, state.userProfile);
-      }
-    } catch (error) {
-      console.warn("user profile sync skipped", error);
-    }
-    let remoteTasks = [];
-    try {
-      remoteTasks = await fetchTasks(state.username);
-    } catch (error) {
-      if (state.username !== LEGACY_USERNAME) throw error;
-    }
-    let remoteVersions = [];
-    try {
-      remoteVersions = await fetchTaskVersions(state.username);
-    } catch (error) {
-      if (state.username !== LEGACY_USERNAME) throw error;
-    }
-    if (remoteVersions.length) {
-      state.taskVersions = remoteVersions;
-      state.tasks = tasksAt(todayKey());
-      await saveTaskVersions(state.username, state.taskVersions);
-      await saveTasks(state.username, state.tasks);
-    } else if (remoteTasks.length) {
-      state.tasks = remoteTasks.map((task, index) => normalizeTask(task, index));
-      state.taskVersions = ensureInitialTaskVersion(state.taskVersions, state.tasks, state.username === LEGACY_USERNAME ? EFFECTIVE_START_DATE : (state.tasks[0]?.createdDate ?? todayKey()));
-      await saveTasks(state.username, state.tasks);
-      await saveTaskVersions(state.username, state.taskVersions);
-      try {
-        await saveTaskVersionsRemote(state.username, state.taskVersions);
-      } catch (error) {
-        if (state.username !== LEGACY_USERNAME) throw error;
-      }
-    } else if (state.tasks.length) {
-      try {
-        await saveTaskVersionsRemote(state.username, state.taskVersions);
-        const savedTasks = await saveTasksRemote(state.username, state.tasks);
-        if (savedTasks.length) state.tasks = savedTasks.map((task, index) => normalizeTask(task, index));
-      } catch (error) {
-        if (state.username !== LEGACY_USERNAME) throw error;
-      }
-    }
-    for (const task of state.tasks) {
-      if (!state.taskMonths[task.id]) state.taskMonths[task.id] = startOfMonth(todayKey());
-    }
-    for (const item of currentUserRecords()) {
-      await saveRecord(item.taskId, item.date, item.completed, state.username);
-    }
-    const cloud = await fetchRecords(state.username);
-    if (cloud) {
-      loadRecordArray(cloud);
-      await saveCache(state.username, currentUserRecords());
-      render();
-    }
-    state.cloudStatus = "synced";
-    render();
+    await withTimeout(syncRemoteState(), CLOUD_SYNC_TIMEOUT_MS, "云端同步超时");
   } catch (error) {
     state.cloudStatus = "local";
     showMessage(`${error.message || "云端连接失败"}，正在显示缓存`);
   }
+}
+
+async function syncRemoteState() {
+  await initializeCloud();
+  try {
+    await refreshUsersFromCloud();
+  } catch (error) {
+    if (state.username !== LEGACY_USERNAME) throw error;
+  }
+  await ensureRemoteCurrentUser();
+  try {
+    const remoteProfile = await fetchUserProfile(state.username);
+    if (remoteProfile) {
+      state.userProfile = remoteProfile;
+      await saveUserProfile(state.username, remoteProfile);
+    } else if (state.userProfile) {
+      state.userProfile = await saveUserProfileRemote(state.username, state.userProfile);
+      await saveUserProfile(state.username, state.userProfile);
+    }
+  } catch (error) {
+    console.warn("user profile sync skipped", error);
+  }
+  let remoteTasks = [];
+  try {
+    remoteTasks = await fetchTasks(state.username);
+  } catch (error) {
+    if (state.username !== LEGACY_USERNAME) throw error;
+  }
+  let remoteVersions = [];
+  try {
+    remoteVersions = await fetchTaskVersions(state.username);
+  } catch (error) {
+    if (state.username !== LEGACY_USERNAME) throw error;
+  }
+  if (remoteVersions.length) {
+    state.taskVersions = remoteVersions;
+    state.tasks = tasksAt(todayKey());
+    await saveTaskVersions(state.username, state.taskVersions);
+    await saveTasks(state.username, state.tasks);
+  } else if (remoteTasks.length) {
+    state.tasks = remoteTasks.map((task, index) => normalizeTask(task, index));
+    state.taskVersions = ensureInitialTaskVersion(state.taskVersions, state.tasks, state.username === LEGACY_USERNAME ? EFFECTIVE_START_DATE : (state.tasks[0]?.createdDate ?? todayKey()));
+    await saveTasks(state.username, state.tasks);
+    await saveTaskVersions(state.username, state.taskVersions);
+    try {
+      await saveTaskVersionsRemote(state.username, state.taskVersions);
+    } catch (error) {
+      if (state.username !== LEGACY_USERNAME) throw error;
+    }
+  } else if (state.tasks.length) {
+    try {
+      await saveTaskVersionsRemote(state.username, state.taskVersions);
+      const savedTasks = await saveTasksRemote(state.username, state.tasks);
+      if (savedTasks.length) state.tasks = savedTasks.map((task, index) => normalizeTask(task, index));
+    } catch (error) {
+      if (state.username !== LEGACY_USERNAME) throw error;
+    }
+  }
+  for (const task of state.tasks) {
+    if (!state.taskMonths[task.id]) state.taskMonths[task.id] = startOfMonth(todayKey());
+  }
+  for (const item of currentUserRecords()) {
+    await saveRecord(item.taskId, item.date, item.completed, state.username);
+  }
+  const cloud = await fetchRecords(state.username);
+  if (cloud) {
+    loadRecordArray(cloud);
+    await saveCache(state.username, currentUserRecords());
+    render();
+  }
+  state.cloudStatus = "synced";
+  render();
 }
 
 function normalizeBirthDateInput(value) {

@@ -1,4 +1,4 @@
-const CACHE = "wansui-v30";
+const CACHE = "wansui-v31";
 const ASSETS = [
   "./",
   "./index.html",
