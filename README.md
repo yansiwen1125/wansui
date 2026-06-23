@@ -34,11 +34,12 @@ node scripts/build.mjs
 
 ## Supabase
 
-1. 在 Supabase SQL Editor 执行 [`app/supabase/schema.sql`](./app/supabase/schema.sql)。
-2. 将 `app/config.js` 中的 `supabaseUrl` 和 `supabasePublishableKey` 填入。
-3. 未配置 Supabase 时，应用使用本机 IndexedDB 模式，方便先预览与验收 UI。
+1. 在 Supabase SQL Editor 执行 [`app/supabase/schema.sql`](./app/supabase/schema.sql)，这是 V1.x 打卡数据基础表。
+2. 如果要启用 V2.0 首页运势塔罗，再执行 [`app/supabase/migrations/v2.0.sql`](./app/supabase/migrations/v2.0.sql)。
+3. 将 `app/config.js` 中的 `supabaseUrl` 和 `supabasePublishableKey` 填入。
+4. 未配置 Supabase 时，应用使用本机 IndexedDB 模式，方便先预览与验收 UI。
 
-固定用户名为 `ysw`，固定生效日期为 `2026-06-10`。
+V1.x 旧用户 `ysw` 会保留；打卡固定生效日期为 `2026-06-10`。V2.0 首页运势塔罗从用户首次填写出生信息当天开始生成。
 
 ## 发布
 

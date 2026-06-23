@@ -5,6 +5,7 @@
   --text: #252522;
   --muted: #77756f;
   --weak: #aaa8a1;
+  --input-placeholder: #77756f;
   --line: #e8e5de;
   --gray: #d8d6d0;
   --light-gray: #eceae5;
@@ -78,16 +79,111 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--text); outl
 
 .bottom-nav {
   position: fixed; z-index: 10; bottom: 0; left: 50%; transform: translateX(-50%); width: min(100%, 480px); height: calc(78px + env(safe-area-inset-bottom));
-  padding: 8px 14% env(safe-area-inset-bottom); background: rgba(255,255,255,.94); border-top: 1px solid var(--line); display: flex; justify-content: space-between;
+  padding: 8px 5% env(safe-area-inset-bottom); background: rgba(255,255,255,.94); border-top: 1px solid var(--line); display: flex; justify-content: space-between;
 }
-.bottom-nav button { border: 0; background: none; min-width: 72px; min-height: 54px; color: var(--weak); display: grid; justify-items: center; align-content: center; gap: 5px; font-size: 11px; }
+.bottom-nav button { border: 0; background: none; min-width: 62px; min-height: 54px; color: var(--weak); display: grid; justify-items: center; align-content: center; gap: 5px; font-size: 11px; }
 .bottom-nav svg { width: 22px; height: 22px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
 .bottom-nav button.active { color: var(--text); font-weight: 700; }
 .bottom-nav button.active svg { fill: none; }
 .bottom-nav button.active svg path, .bottom-nav button.active svg rect { stroke: currentColor; }
 .bottom-nav button.active[data-route="home"] svg path { fill: currentColor; stroke: currentColor; }
+.bottom-nav button.active[data-route="checkin"] svg circle { fill: currentColor; stroke: currentColor; }
+.bottom-nav button.active[data-route="checkin"] svg path { stroke: #fff; }
 .bottom-nav button.active[data-route="month"] svg rect { fill: currentColor; stroke: currentColor; }
 .bottom-nav button.active[data-route="month"] svg path { stroke: #fff; }
+.bottom-nav button.active[data-route="profile"] svg circle { fill: currentColor; stroke: currentColor; }
+.bottom-nav button.active[data-route="profile"] svg path { stroke: currentColor; }
+
+.fortune-overview { display: grid; grid-template-columns: repeat(7, 1fr); align-items: center; margin: 24px 0 38px; }
+.fortune-day { justify-self: center; width: 38px; height: 38px; display: grid; place-items: center; border: 2px solid transparent; border-radius: 12px; background: #f0ede7; color: var(--weak); font-weight: 750; font-size: 13px; }
+.fortune-day.selected { border-color: var(--text); background: #fff; color: var(--text); }
+.fortune-day.future { opacity: .5; }
+.reading-result { display: grid; gap: 18px; }
+.fortune-title { margin: 0; font-size: 28px; line-height: 1.15; font-weight: 750; }
+.daily-tip-card { padding: 20px 20px 22px; border: 1.5px solid var(--gray); border-radius: 20px; background: #fff; }
+.daily-tip-card h3 { margin: 0 0 16px; color: #8d6e63; font-size: 17px; line-height: 1.2; }
+.daily-tip-card p { margin: 0; color: var(--muted); font-size: 15px; line-height: 1.75; }
+.fortune-facts small { color: #8d6e63; font-size: 15px; font-weight: 760; }
+.fortune-facts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.fortune-facts div { min-height: 92px; padding: 17px 18px 18px; border-radius: 20px; background: #fff; border: 1.5px solid var(--gray); }
+.fortune-facts p { margin: 13px 0 0; color: var(--text); font-size: 15px; line-height: 1.55; font-weight: 650; }
+.fortune-facts i { display: inline-block; width: 14px; height: 14px; margin-right: 8px; border-radius: 50%; vertical-align: -2px; }
+.astro-card, .tarot-readings article { padding: 22px 20px 24px; border: 1.5px solid var(--gray); border-radius: 24px; background: #fff; }
+.astro-card h2, .tarot-readings h3 { margin: 0 0 18px; color: #8d6e63; font-size: 17px; line-height: 1.2; }
+.astro-card p, .tarot-readings p { margin: 0; color: var(--muted); font-size: 15px; line-height: 1.85; }
+.tarot-hero { text-align: center; padding: 16px 0 14px; }
+.tarot-hero img { width: min(172px, 48vw); border-radius: 8px; box-shadow: 0 16px 36px rgba(83,75,63,.18); display: block; margin: 0 auto 28px; }
+.tarot-hero h2 { margin: 0; font-size: 24px; line-height: 1.15; }
+.tarot-hero p { margin: 12px 0 0; color: var(--muted); font-size: 13px; font-weight: 650; }
+.tarot-readings { display: grid; gap: 14px; }
+.profile-required-card { margin-top: 30px; padding: 24px 20px; border: 1.5px solid var(--gray); border-radius: 24px; background: #fff; }
+.profile-required-card h2 { margin: 0 0 10px; font-size: 25px; }
+.profile-required-card p { margin: 0 0 22px; color: var(--muted); font-size: 14px; line-height: 1.7; }
+.fortune-loading { min-height: 300px; padding-top: 102px; text-align: center; }
+.fortune-loading h2 { margin: 0 0 24px; font-size: 27px; line-height: 1.1; font-weight: 750; }
+.fortune-loading p { margin: 0; color: var(--muted); font-size: 15px; line-height: 1.85; }
+.fortune-loading div { display: flex; justify-content: center; gap: 16px; margin-top: 38px; }
+.fortune-loading i { width: 10px; height: 10px; border-radius: 50%; background: var(--weak); }
+.fortune-loading i:first-child { background: var(--text); }
+.profile-entry-card { margin-top: 22px; padding: 0; border: 0; border-radius: 0; background: transparent; }
+.profile-entry-screen .brand-row { margin-bottom: 72px; }
+.profile-entry-card h2 { margin: 0 0 12px; font-size: 27px; line-height: 1.1; }
+.profile-entry-card p { margin: 0 0 28px; font-size: 14px; line-height: 1.65; }
+.profile-edit-card { margin-top: 30px; }
+.profile-edit-card h2 { font-size: 28px; }
+.profile-edit-card p { color: var(--muted); }
+.profile-edit-note { margin: 34px 0 0; color: var(--muted); font-size: 15px; line-height: 1.65; }
+.profile-history-note { display: grid; gap: 10px; margin-top: 42px; padding: 20px 24px; border-radius: 22px; background: #efece5; }
+.profile-history-note strong { font-size: 13px; }
+.profile-history-note span { color: var(--muted); font-size: 13px; line-height: 1.55; }
+.inline-link { margin-top: 18px; }
+.skip-checkin-link { margin-top: 24px; display: block; width: 100%; color: var(--muted); font-size: 14px; font-weight: 650; line-height: 1; text-align: center; }
+.birth-form { display: grid; gap: 14px; }
+.birth-form.embedded { margin-top: 0; }
+.birth-form label:not(.checkbox-row) { display: grid; gap: 5px; padding: 15px 18px; background: #fff; border: 1.5px solid var(--gray); border-radius: 20px; }
+.birth-form .birth-field { position: relative; min-height: 68px; padding-right: 54px; }
+.birth-form label span { color: var(--weak); font-size: 12px; }
+.birth-form input { border: 0; outline: 0; font-size: 17px; color: var(--text); background: transparent; min-width: 0; }
+.birth-form input::placeholder { color: var(--input-placeholder); opacity: 1; }
+.birth-field > i { position: absolute; right: 18px; top: 50%; transform: translateY(-50%); width: 24px; height: 24px; color: var(--muted); display: grid; place-items: center; pointer-events: none; }
+.birth-field svg { width: 23px; height: 23px; fill: none; stroke: currentColor; stroke-width: 1.9; stroke-linecap: round; stroke-linejoin: round; }
+.birth-form .checkbox-row { display: flex; align-items: center; gap: 12px; padding: 2px 0 4px 4px; color: var(--muted); font-size: 14px; }
+.birth-form .checkbox-row input { position: absolute; opacity: 0; pointer-events: none; }
+.birth-form .checkbox-box {
+  flex: 0 0 22px;
+  width: 22px;
+  height: 22px;
+  border: 1.5px solid var(--gray);
+  border-radius: 7px;
+  background: #fff;
+  display: grid;
+  place-items: center;
+  color: var(--text);
+}
+.birth-form .checkbox-box::after { content: ""; width: 10px; height: 6px; border-left: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(-45deg) translate(1px, -1px); opacity: 0; }
+.birth-form .checkbox-row input:checked + .checkbox-box::after { opacity: 1; }
+.profile-entry-card .birth-form { gap: 0; }
+.profile-entry-card .birth-form label:not(.checkbox-row) { min-height: 68px; padding: 13px 22px 12px; border-radius: 20px; }
+.profile-entry-card .birth-form .birth-date-error + .birth-time-field { margin-top: 18px; }
+.profile-entry-card .birth-form .birth-time-error + .checkbox-row { margin-top: 14px; }
+.profile-entry-card .birth-form .checkbox-row + .birth-city-field { margin-top: 28px; }
+.profile-entry-card .birth-form .birth-field { padding-right: 22px; }
+.profile-entry-card .birth-field > i { display: none; }
+.profile-entry-card .birth-form label span { color: var(--weak); font-size: 12px; line-height: 1; }
+.profile-entry-card .birth-form input { margin-top: 6px; color: var(--text); font-size: 17px; line-height: 1.2; }
+.profile-entry-card .birth-form input::placeholder { color: var(--input-placeholder); opacity: 1; }
+.profile-entry-card .birth-form .checkbox-row { justify-self: start; display: inline-flex; align-items: center; width: auto; height: 22px; margin: 0; padding: 0; gap: 12px; color: var(--muted); }
+.profile-entry-card .birth-form .checkbox-box { flex-basis: 22px; width: 22px; height: 22px; border-width: 1.5px; border-radius: 7px; }
+.profile-entry-card .birth-form .checkbox-text { display: block; color: var(--muted); font-size: 14px; font-weight: 400; line-height: 22px; }
+.profile-entry-card .field-error:empty { display: none; }
+.profile-entry-card .field-error:not(:empty) { min-height: 0; margin: 8px 4px 0; color: #a9795b; }
+.profile-entry-card .primary-button { margin-top: 54px; }
+.profile-card { display: grid; gap: 8px; padding: 22px 20px; border-radius: 22px; background: #fff; border: 1.5px solid var(--gray); }
+.profile-card small { color: var(--weak); font-size: 12px; }
+.profile-card strong { font-size: 24px; }
+.profile-actions { display: grid; gap: 12px; margin-top: 18px; }
+.profile-actions button { min-height: 62px; padding: 0 18px; border: 1.5px solid var(--gray); border-radius: 20px; background: #fff; display: flex; align-items: center; justify-content: space-between; font-weight: 700; }
+.profile-actions svg { width: 22px; fill: none; stroke: var(--muted); stroke-width: 2.4; stroke-linecap: round; stroke-linejoin: round; }
 
 .record-tabs { display: flex; align-items: baseline; gap: 28px; margin: 12px 0 32px; height: 40px; }
 .record-tabs button { padding: 0; border: 0; background: none; color: var(--weak); font-size: 20px; }
@@ -146,11 +242,13 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--text); outl
 #register-form label, .task-form label { display: grid; gap: 5px; padding: 15px 20px; background: #fff; border: 1.5px solid var(--gray); border-radius: 20px; }
 #login-form label span { color: var(--weak); font-size: 12px; }
 #login-form input, #register-form input, .task-form input { border: 0; outline: 0; font-size: 18px; color: var(--text); background: transparent; }
+#login-form input::placeholder, #register-form input::placeholder, .task-form input::placeholder { color: var(--input-placeholder); opacity: 1; }
 #register-form label span, .task-form label span { color: var(--weak); font-size: 12px; }
-.field-error { min-height: 20px; margin: 5px 4px; color: #a25950; font-size: 12px; }
+.field-error { min-height: 20px; margin: 5px 4px; color: #a9795b; font-size: 12px; }
 .primary-button { width: 100%; height: 58px; padding: 0 25px; border: 0; border-radius: 18px; background: var(--text); color: white; font-weight: 650; display: flex; justify-content: center; align-items: center; position: relative; }
 .primary-button b { position: absolute; right: 28px; font-size: 28px; font-weight: 300; }
 .text-link { border: 0; background: none; padding: 0; color: inherit; display: grid; gap: 5px; justify-items: center; }
+.text-link.skip-checkin-link { display: block; color: var(--muted); font-size: 14px; font-weight: 650; line-height: 1; text-align: center; }
 .register-link, .register-bottom-link { margin-top: 22px; margin-bottom: 0; line-height: 1.15; }
 .text-link span { color: var(--muted); font-size: 14px; line-height: 1.25; }
 .text-link strong { font-size: 18px; }

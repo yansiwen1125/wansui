@@ -7,6 +7,7 @@ const files = [
   "config.js",
   "manifest.webmanifest",
   "sw.js",
+  "assets",
   "src",
   "icons"
 ];

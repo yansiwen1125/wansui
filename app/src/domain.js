@@ -99,6 +99,10 @@ export function isEditable(key, today = todayKey()) {
   return key >= EFFECTIVE_START_DATE && key <= today;
 }
 
+export function canViewReadingDate(date, readingStartDate, today = todayKey()) {
+  return Boolean(readingStartDate) && date >= readingStartDate && date <= today;
+}
+
 export function normalizeUsername(value) {
   return String(value ?? "").trim().toLowerCase();
 }

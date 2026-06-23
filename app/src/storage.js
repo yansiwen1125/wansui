@@ -5,6 +5,7 @@ import {
   normalizeTask,
   normalizeTaskVersions
 } from "./domain.js";
+import { normalizeDailyReading } from "./reading.js";
 
 const DB_NAME = "wansui-v1";
 const STORE = "state";
@@ -95,6 +96,22 @@ export async function loadTaskVersions(username) {
 
 export async function saveTaskVersions(username, versions) {
   await setValue(`task-versions:v1.2:${username}`, normalizeTaskVersions(versions));
+}
+
+export async function loadUserProfile(username) {
+  return getValue(`user-profile:v2:${username}`, null);
+}
+
+export async function saveUserProfile(username, profile) {
+  await setValue(`user-profile:v2:${username}`, profile);
+}
+
+export async function loadDailyReading(username, date) {
+  return normalizeDailyReading(await getValue(`daily-reading:v2:${username}:${date}`, null));
+}
+
+export async function saveDailyReading(username, reading) {
+  await setValue(`daily-reading:v2:${username}:${reading.date}`, normalizeDailyReading(reading));
 }
 
 export function currentUsername() {

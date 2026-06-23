@@ -8,6 +8,7 @@ import {
   activeTasks,
   addDays,
   addMonths,
+  canViewReadingDate,
   completionCount,
   createTaskVersion,
   createDefaultTasks,
@@ -36,37 +37,46 @@ import {
   validateUsername,
   visibleTasks,
   weekKeys
-} from "./domain.js?v=1.2.4";
+} from "./domain.js?v=2.0.12";
 import {
   cloudEnabled,
   deleteTaskRemote,
+  fetchDailyReading,
   fetchRecords,
   fetchTasks,
   fetchTaskVersions,
+  fetchUserProfile,
   fetchUsers,
   hasCompletedRecordRemote,
   initializeCloud,
   saveRecord,
+  saveDailyReadingRemote,
   saveTaskVersionRemote,
   saveTaskVersionsRemote,
+  saveUserProfileRemote,
   saveTasksRemote,
   saveUser
-} from "./api.js?v=1.2.4";
+} from "./api.js?v=2.0.12";
+import { READING_ALGORITHM_VERSION, generateDailyReading, normalizeDailyReading } from "./reading.js?v=2.0.12";
 import {
   currentUsername,
   ensureLegacyUser,
   isLoggedIn,
   loadCache,
+  loadDailyReading,
   loadTaskVersions,
   loadTasks,
+  loadUserProfile,
   loadUsers,
   logout,
   saveCache,
+  saveDailyReading,
   saveTaskVersions,
   saveTasks,
+  saveUserProfile,
   saveUsers,
   setLoggedIn
-} from "./storage.js?v=1.2.4";
+} from "./storage.js?v=2.0.12";
 
 const app = document.querySelector("#app");
 const state = {
@@ -84,9 +94,15 @@ const state = {
   offline: !navigator.onLine,
   cloudStatus: cloudEnabled() ? "syncing" : "local",
   taskMonths: {},
+  userProfile: null,
+  tarotCards: [],
+  dailyReadings: new Map(),
+  readingLoading: "",
+  readingPreloading: new Set(),
   editingTaskId: "",
   confirmingDeleteTaskId: "",
   hiddenExpanded: false,
+  profileErrors: {},
   formError: ""
 };
 
@@ -209,7 +225,9 @@ function canDeleteTask(taskId) {
 
 function icon(name) {
   if (name === "home") return `<svg viewBox="0 0 24 24"><path d="M3 11 12 3l9 8v10h-6v-7H9v7H3z"/></svg>`;
+  if (name === "checkin") return `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M8 12l3 3 5-6"/></svg>`;
   if (name === "records") return `<svg viewBox="0 0 24 24"><rect x="4" y="3" width="16" height="18" rx="5"/><path d="M8 8h8M8 12h8M8 16h5"/></svg>`;
+  if (name === "profile") return `<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="4"/><path d="M5 21c1.5-5 12.5-5 14 0"/></svg>`;
   if (name === "edit") return `<svg viewBox="0 0 24 24"><path d="M5 19l4-.8L19 8.2 15.8 5 5.8 15z"/><path d="M14.5 6.5l3 3"/></svg>`;
   if (name === "delete") return `<svg viewBox="0 0 24 24"><path d="M6 7h12"/><path d="M9 7V5h6v2"/><path d="M8 10l1 9h6l1-9"/></svg>`;
   if (name === "hide") return `<svg viewBox="0 0 24 24"><path d="M3 12s4-6 9-6 9 6 9 6-4 6-9 6-9-6-9-6z"/><path d="M4 20 20 4"/></svg>`;
@@ -234,8 +252,14 @@ function bottomNav(active) {
       <button data-route="home" class="${active === "home" ? "active" : ""}">
         ${icon("home")}<span>首页</span>
       </button>
+      <button data-route="checkin" class="${active === "checkin" ? "active" : ""}">
+        ${icon("checkin")}<span>打卡</span>
+      </button>
       <button data-route="month" class="${active === "records" ? "active" : ""}">
         ${icon("records")}<span>记录</span>
+      </button>
+      <button data-route="profile" class="${active === "profile" ? "active" : ""}">
+        ${icon("profile")}<span>我的</span>
       </button>
     </nav>`;
 }
@@ -255,6 +279,81 @@ function userSwitch() {
   return `<button class="user-switch" data-logout><span>${state.username}</span><strong>切换</strong></button>`;
 }
 
+function readingStartDate() {
+  return state.userProfile?.readingStartDate ?? todayKey();
+}
+
+function readingMapKey(username = state.username, date = state.selectedDate) {
+  return `${username}:${date}`;
+}
+
+function currentReading(date = state.selectedDate) {
+  const key = readingMapKey(state.username, date);
+  const reading = state.dailyReadings.get(key) ?? null;
+  if (!reading || isCurrentReading(reading)) return reading;
+  state.dailyReadings.delete(key);
+  return null;
+}
+
+function overviewReadingLabel(date, hasProfile, today) {
+  if (!canViewReadingDate(date, hasProfile ? readingStartDate() : "", today)) return "--";
+  return currentReading(date)?.score ?? "—";
+}
+
+function renderBirthProfileForm({ embedded = false, submitLabel = "", beforeSubmitHtml = "" } = {}) {
+  const profile = state.userProfile ?? {};
+  const buttonLabel = submitLabel || (state.userProfile ? "保存出生信息" : "保存并开始");
+  return `
+    <form id="profile-form" class="birth-form ${embedded ? "embedded" : ""}">
+      <label class="birth-field birth-date-field">
+        <span>出生日期</span>
+        <input type="text" name="birthDate" inputmode="numeric" autocomplete="bday" value="${escapeHtml(formatBirthDateInput(profile.birthDate))}" placeholder="例如 20021125" required>
+        <i aria-hidden="true">${fieldIcon("calendar")}</i>
+      </label>
+      <p class="field-error birth-date-error" aria-live="polite">${escapeHtml(state.profileErrors.birthDate ?? "")}</p>
+      <label class="birth-field birth-time-field">
+        <span>出生时间</span>
+        <input type="text" name="birthTime" inputmode="numeric" autocomplete="off" value="${escapeHtml(formatBirthTimeInput(profile.birthTime))}" placeholder="例如 8:30">
+        <i aria-hidden="true">${fieldIcon("clock")}</i>
+      </label>
+      <p class="field-error birth-time-error" aria-live="polite">${escapeHtml(state.profileErrors.birthTime ?? "")}</p>
+      <label class="checkbox-row">
+        <input type="checkbox" name="birthTimeUnknown" ${profile.birthTimeUnknown ? "checked" : ""}>
+        <span class="checkbox-box" aria-hidden="true"></span>
+        <span class="checkbox-text">我不知道出生时间</span>
+      </label>
+      <label class="birth-field birth-city-field">
+        <span>出生城市</span>
+        <input name="birthCity" value="${escapeHtml(profile.birthCity ?? "")}" placeholder="可稍后补充">
+      </label>
+      <p class="field-error birth-city-error" aria-live="polite">${escapeHtml(state.profileErrors.birthCity ?? "")}</p>
+      ${beforeSubmitHtml}
+      <button class="primary-button">${buttonLabel}</button>
+    </form>`;
+}
+
+function fieldIcon(name) {
+  if (name === "calendar") {
+    return `<svg viewBox="0 0 24 24"><rect x="5" y="6.5" width="14" height="13" rx="3"/><path d="M8 4v5M16 4v5M5 11h14"/></svg>`;
+  }
+  if (name === "clock") {
+    return `<svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="7.5"/><path d="M12 7.5V12l3 2"/></svg>`;
+  }
+  return "";
+}
+
+function formatBirthDateInput(date) {
+  if (!date) return "";
+  const [year, month, day] = date.split("-").map(Number);
+  if (!year || !month || !day) return date;
+  return `${year}年${month}月${day}日`;
+}
+
+function formatBirthTimeInput(time) {
+  if (!time) return "";
+  return time.slice(0, 5);
+}
+
 function gridSquares(date, size = "week") {
   const tasks = currentTasks(date).slice(0, size === "month" ? 9 : 4);
   const squares = tasks.map((task) => {
@@ -271,7 +370,7 @@ function renderLogin() {
     <main class="screen login-screen">
       <section class="login-content">
         <h1>万岁</h1>
-        <p>把今天做过的事，好好记下来。</p>
+        <p>每天看看自己，也好好过今天。</p>
         <form id="login-form">
           <label><span>用户名</span><input name="username" autocomplete="username" placeholder="请输入用户名"></label>
         <p class="field-error" aria-live="polite">${state.formError}</p>
@@ -280,7 +379,7 @@ function renderLogin() {
         <button class="text-link register-link" data-route="register"><span>还没有用户名？</span><strong>去注册</strong></button>
         <aside class="login-note compact">
           <strong>＋</strong>
-          <div><b>V1.2 · 任务编辑修正版</b><span>输入已注册用户名即可进入</span><span>未注册会跳转到注册页</span></div>
+          <div><b>V2.0 · 运势与打卡</b><span>输入已注册用户名即可进入</span><span>未填写出生信息时，首页会先显示填写表单</span></div>
         </aside>
       </section>
     </main>`;
@@ -308,12 +407,101 @@ function renderRegister() {
 
 function renderHome() {
   const today = todayKey();
+  const days = weekKeys(state.selectedDate);
+  const hasProfile = Boolean(state.userProfile);
+  const beforeStart = hasProfile && state.selectedDate < readingStartDate();
+  const readable = hasProfile && canViewReadingDate(state.selectedDate, readingStartDate(), today);
+  const reading = readable ? currentReading() : null;
+  if (!hasProfile) {
+    app.innerHTML = `
+      <main class="screen app-screen fortune-screen profile-entry-screen">
+        <header class="brand-row"><h1>万岁</h1><div class="brand-actions">${statusLine()}</div></header>
+        <section class="profile-required-card profile-entry-card">
+          <h2>填写出生信息</h2>
+          <p>用于生成你的每日运势和塔罗。<br>这些信息不会展示给别人。</p>
+          ${renderBirthProfileForm({ embedded: true })}
+          <button class="text-link skip-checkin-link" data-route="checkin">暂不填写，去打卡</button>
+        </section>
+        ${bottomNav("home")}
+        ${state.message ? `<div class="toast">${state.message}</div>` : ""}
+      </main>`;
+    return;
+  }
+  app.innerHTML = `
+    <main class="screen app-screen fortune-screen">
+      <header class="brand-row"><h1>万岁</h1><div class="brand-actions">${statusLine()}</div></header>
+      <section class="date-nav">
+        <button data-date-step="-1" ${!hasProfile || addDays(state.selectedDate, -1) < readingStartDate() ? "disabled" : ""}>${chevron("left")}</button>
+        <strong>${dateLabel(state.selectedDate)}</strong>
+        <button data-date-step="1" ${!hasProfile || state.selectedDate >= today ? "disabled" : ""}>${chevron("right")}</button>
+      </section>
+      <section class="fortune-overview">
+        ${days.map((date) => {
+          const classes = [
+            date === state.selectedDate ? "selected" : "",
+            !canViewReadingDate(date, hasProfile ? readingStartDate() : "", today) ? "future" : ""
+          ].filter(Boolean).join(" ");
+          return `<div class="fortune-day ${classes}"><span>${overviewReadingLabel(date, hasProfile, today)}</span></div>`;
+        }).join("")}
+      </section>
+      ${beforeStart ? `<section class="profile-required-card">
+          <h2>暂无运势记录</h2>
+          <p>你的首页运势和塔罗会从 ${readingStartDate()} 开始生成。之前的日期不会补生成，但打卡记录仍然保留。</p>
+        </section>`
+        : reading ? renderReading(reading)
+        : `<section class="fortune-loading">
+          <h2>正在生成</h2>
+          <p>正在为今天准备运势和塔罗。</p>
+          <p>生成后结果会保持稳定。</p>
+          <div aria-hidden="true"><i></i><i></i><i></i></div>
+        </section>`}
+      ${bottomNav("home")}
+      ${state.message ? `<div class="toast">${state.message}</div>` : ""}
+    </main>`;
+}
+
+function renderReading(reading) {
+  return `
+    <section class="reading-result">
+      <h2 class="fortune-title">今日运势 ${reading.score}</h2>
+      <article class="daily-tip-card">
+        <h3>今日提示</h3>
+        <p>${escapeHtml(reading.summary)}</p>
+      </article>
+      <section class="fortune-facts">
+        <div><small>适合</small><p>${reading.goodTags.map(escapeHtml).join("、")}</p></div>
+        <div><small>不适合</small><p>${reading.cautionTags.map(escapeHtml).join("、")}</p></div>
+        <div><small>幸运数字</small><p>${reading.luckyNumber}</p></div>
+        <div><small>幸运颜色</small><p><i style="background:${reading.luckyColor?.value ?? "#82BDE3"}"></i>${escapeHtml(reading.luckyColor?.name ?? "蓝色")}</p></div>
+      </section>
+      <section class="astro-card">
+        <h2>星盘提示</h2>
+        <p>${escapeHtml(reading.astrologyText)}</p>
+      </section>
+      <section class="tarot-hero">
+        <img src="${escapeHtml(reading.tarot?.image ?? "assets/tarot/cards/major-17-star.png")}" alt="${escapeHtml(reading.tarot?.nameZh ?? "塔罗牌")}">
+        <h2>${escapeHtml(reading.tarot?.nameZh ?? "星星")} · ${escapeHtml(reading.tarot?.orientationLabel ?? "正位")}</h2>
+        <p>${escapeHtml(reading.tarot?.keywords ?? "")}</p>
+      </section>
+      <section class="tarot-readings">
+        ${[
+          ["整体能量", reading.tarot?.overall],
+          ["工作学习", reading.tarot?.work],
+          ["关系情绪", reading.tarot?.relationship],
+          ["今日提醒", reading.tarot?.reminder]
+        ].map(([title, text]) => `<article><h3>${title}</h3><p>${escapeHtml(text ?? "")}</p></article>`).join("")}
+      </section>
+    </section>`;
+}
+
+function renderCheckin() {
+  const today = todayKey();
   const tasks = currentTasks(state.selectedDate);
   const completed = completionCountAt(state.selectedDate);
   const days = weekKeys(state.selectedDate);
   app.innerHTML = `
     <main class="screen app-screen">
-      <header class="brand-row"><h1>万岁</h1><div class="brand-actions">${statusLine()}${userSwitch()}</div></header>
+      <header class="brand-row"><h1>打卡</h1><div class="brand-actions">${statusLine()}</div></header>
       <section class="date-nav">
         <button data-date-step="-1" ${state.selectedDate <= EFFECTIVE_START_DATE ? "disabled" : ""}>${chevron("left")}</button>
         <strong>${dateLabel(state.selectedDate)}</strong>
@@ -346,8 +534,45 @@ function renderHome() {
         </div>
         <button class="edit-entry" data-route="edit">编辑打卡事件</button>
       </section>
-      ${bottomNav("home")}
+      ${bottomNav("checkin")}
       ${state.message ? `<div class="toast">${state.message}</div>` : ""}
+    </main>`;
+}
+
+function renderProfile() {
+  app.innerHTML = `
+    <main class="screen app-screen profile-screen">
+      <header class="brand-row"><h1>我的</h1><div class="brand-actions">${statusLine()}</div></header>
+      <section class="profile-card">
+        <small>当前账号</small>
+        <strong>${escapeHtml(state.username)}</strong>
+      </section>
+      <section class="profile-actions">
+        <button data-route="profile-edit"><span>编辑出生信息</span>${chevron("right")}</button>
+        <button data-logout><span>切换账号</span>${chevron("right")}</button>
+      </section>
+      ${bottomNav("profile")}
+    </main>`;
+}
+
+function renderProfileEdit() {
+  app.innerHTML = `
+    <main class="screen app-screen edit-screen">
+      <header class="edit-header">
+        <button data-route="profile">${chevron("left")}</button>
+        <h1>编辑出生信息</h1>
+      </header>
+      <p class="profile-edit-note">未来新生成的结果会使用新信息。</p>
+      <section class="profile-edit-card profile-entry-card">
+        <h2>出生信息</h2>
+        ${renderBirthProfileForm({
+          submitLabel: "保存修改",
+          beforeSubmitHtml: `<aside class="profile-history-note">
+            <strong>说明</strong>
+            <span>已生成的历史运势不会自动重算</span>
+          </aside>`
+        })}
+      </section>
     </main>`;
 }
 
@@ -458,7 +683,7 @@ function renderEdit() {
   app.innerHTML = `
     <main class="screen app-screen edit-screen">
       <header class="edit-header">
-        <button data-route="home">${chevron("left")}</button>
+        <button data-route="checkin">${chevron("left")}</button>
         <h1>编辑打卡事件</h1>
       </header>
       <p class="edit-tip">${dateLabel(date)}起生效，之前的历史不变。</p>
@@ -540,11 +765,15 @@ function render() {
   if (state.route === "login") renderLogin();
   else if (state.route === "register") renderRegister();
   else if (state.route === "home") renderHome();
+  else if (state.route === "checkin") renderCheckin();
+  else if (state.route === "profile") renderProfile();
+  else if (state.route === "profile-edit") renderProfileEdit();
   else if (state.route === "tasks") renderTasks();
   else if (state.route === "edit") renderEdit();
   else if (state.route === "new-task" || state.route === "edit-task") renderTaskForm(state.route);
   else renderMonth();
   bindEvents();
+  if (state.route === "home") ensureVisibleReading();
 }
 
 function mergeUsers(localUsers, remoteUsers) {
@@ -581,10 +810,116 @@ async function ensureRemoteCurrentUser(users = state.users) {
   return merged;
 }
 
+async function ensureTarotCards() {
+  if (state.tarotCards.length) return state.tarotCards;
+  try {
+    const [cardsResponse, copyResponse] = await Promise.all([
+      fetch("./assets/tarot/cards.json"),
+      fetch("./assets/tarot/copy.json")
+    ]);
+    const cards = await cardsResponse.json();
+    const copy = await copyResponse.json();
+    state.tarotCards = cards.map((card) => ({
+      ...card,
+      meanings: copy[card.id] ?? null
+    }));
+  } catch {
+    state.tarotCards = [];
+  }
+  return state.tarotCards;
+}
+
+function isCurrentReading(reading) {
+  return reading?.algorithmVersion === READING_ALGORITHM_VERSION;
+}
+
+async function resolveDailyReading(date, { showLoading = false } = {}) {
+  const key = readingMapKey(state.username, date);
+  const cached = state.dailyReadings.get(key);
+  if (cached && isCurrentReading(cached)) return cached;
+  if (cached) state.dailyReadings.delete(key);
+  if (state.readingLoading === date || state.readingPreloading.has(date)) return null;
+  if (showLoading) state.readingLoading = date;
+  state.readingPreloading.add(date);
+  try {
+    const local = await loadDailyReading(state.username, date);
+    if (isCurrentReading(local)) {
+      state.dailyReadings.set(key, local);
+      return local;
+    }
+    let remote = null;
+    if (cloudEnabled() && navigator.onLine) {
+      try {
+        remote = await fetchDailyReading(state.username, date);
+      } catch (error) {
+        console.warn("daily reading remote fetch skipped", error);
+      }
+    }
+    if (isCurrentReading(remote)) {
+      state.dailyReadings.set(key, remote);
+      await saveDailyReading(state.username, remote);
+      return remote;
+    }
+    const cards = await ensureTarotCards();
+    const generated = await generateDailyReading(state.userProfile, date, cards);
+    state.dailyReadings.set(key, generated);
+    await saveDailyReading(state.username, generated);
+    if (cloudEnabled() && navigator.onLine) {
+      try {
+        const saved = await saveDailyReadingRemote(state.username, generated);
+        state.dailyReadings.set(key, saved);
+        await saveDailyReading(state.username, saved);
+        return saved;
+      } catch (error) {
+        console.warn("daily reading remote save skipped", error);
+      }
+    }
+    return generated;
+  } catch (error) {
+    if (showLoading) showMessage(error.message || "真实星盘库加载失败，请稍后重试");
+    return null;
+  } finally {
+    if (showLoading) state.readingLoading = "";
+    state.readingPreloading.delete(date);
+  }
+}
+
+async function ensureOverviewReadings() {
+  if (!state.userProfile) return;
+  const today = todayKey();
+  const dates = weekKeys(state.selectedDate).filter((date) => (
+    canViewReadingDate(date, readingStartDate(), today)
+    && !currentReading(date)
+    && !state.readingPreloading.has(date)
+    && state.readingLoading !== date
+  ));
+  if (!dates.length) return;
+  let updated = false;
+  for (const date of dates) {
+    const reading = await resolveDailyReading(date);
+    if (reading) updated = true;
+  }
+  if (updated) render();
+}
+
+async function ensureVisibleReading() {
+  if (!state.userProfile) return;
+  const date = state.selectedDate;
+  if (!canViewReadingDate(date, readingStartDate(), todayKey())) return;
+  const key = readingMapKey(state.username, date);
+  if (!currentReading(date)) {
+    await resolveDailyReading(date, { showLoading: true });
+    render();
+    return;
+  }
+  await ensureOverviewReadings();
+}
+
 function bindEvents() {
   document.querySelectorAll("[data-route]").forEach((button) => {
     button.addEventListener("click", () => {
       state.formError = "";
+      state.profileErrors = {};
       state.route = button.dataset.route;
       if (state.route === "tasks") state.hiddenExpanded = false;
       render();
@@ -597,8 +932,10 @@ function bindEvents() {
     state.tasks = [];
     state.taskVersions = [];
     state.records = new Map();
+    state.userProfile = null;
     state.route = "login";
     state.formError = "";
+    state.profileErrors = {};
     state.loading = false;
     render();
   });
@@ -743,14 +1080,23 @@ function bindEvents() {
     event.preventDefault();
     saveTaskForm(new FormData(event.currentTarget));
   });
+
+  document.querySelector("#profile-form")?.addEventListener("submit", (event) => {
+    event.preventDefault();
+    saveProfileForm(new FormData(event.currentTarget));
+  });
 }
 
 async function login(username) {
   setLoggedIn(username);
   state.username = username;
+  state.dailyReadings.clear();
+  state.readingPreloading.clear();
+  state.readingLoading = "";
   state.route = "home";
   state.loading = true;
   state.formError = "";
+  state.profileErrors = {};
   render();
   await syncFromCloud();
 }
@@ -760,6 +1106,7 @@ async function ensureUserState() {
   state.users = await loadUsers();
   if (!state.username && isLoggedIn()) state.username = currentUsername();
   if (!state.username) return;
+  state.userProfile = await loadUserProfile(state.username);
   state.tasks = await loadTasks(state.username);
   if (!state.tasks.length) {
     state.tasks = createDefaultTasks(state.username === LEGACY_USERNAME ? EFFECTIVE_START_DATE : todayKey());
@@ -1013,6 +1360,65 @@ async function saveTaskForm(form) {
   render();
 }
 
+async function saveProfileForm(form) {
+  const birthDateText = String(form.get("birthDate") ?? "").trim();
+  const birthTimeUnknown = form.get("birthTimeUnknown") === "on";
+  const birthTimeText = String(form.get("birthTime") ?? "").trim();
+  const birthDate = normalizeBirthDateInput(birthDateText);
+  const birthTime = birthTimeUnknown ? "" : normalizeBirthTimeInput(birthTimeText);
+  const birthCity = String(form.get("birthCity") ?? "").trim();
+  const profileErrors = {};
+  if (!birthDate) {
+    profileErrors.birthDate = "请填写正确的出生日期，例如 20021125";
+  }
+  if (!birthTimeUnknown && birthTimeText && !birthTime) {
+    profileErrors.birthTime = "请填写正确的出生时间，例如 08:30";
+  }
+  if (Object.keys(profileErrors).length) {
+    state.profileErrors = profileErrors;
+    state.formError = "";
+    render();
+    return;
+  }
+  const now = new Date().toISOString();
+  const previousProfile = state.userProfile;
+  const profile = {
+    username: state.username,
+    birthDate,
+    birthTime,
+    birthCity,
+    birthTimezone: previousProfile?.birthTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
+    birthTimeUnknown,
+    readingStartDate: previousProfile?.readingStartDate || todayKey(),
+    createdAt: previousProfile?.createdAt || now,
+    updatedAt: now
+  };
+  state.profileErrors = {};
+  state.formError = "";
+  state.userProfile = profile;
+  await saveUserProfile(state.username, profile);
+  try {
+    if (cloudEnabled() && navigator.onLine) {
+      await ensureRemoteCurrentUser();
+      state.userProfile = await saveUserProfileRemote(state.username, profile);
+      await saveUserProfile(state.username, state.userProfile);
+      state.cloudStatus = "synced";
+    } else {
+      state.cloudStatus = cloudEnabled() ? "local" : "local";
+    }
+    state.selectedDate = todayKey();
+    state.route = state.route === "profile-edit" ? "profile" : "home";
+    showMessage("已保存");
+  } catch (error) {
+    console.error("saveProfileForm failed", error);
+    state.cloudStatus = "local";
+    state.selectedDate = todayKey();
+    state.route = state.route === "profile-edit" ? "profile" : "home";
+    showMessage("已存本机，待同步");
+  }
+  render();
+}
+
 async function deleteTask(taskId) {
   if (!taskId) return;
   const date = editEffectiveDate();
@@ -1099,6 +1505,18 @@ async function syncFromCloud() {
       if (state.username !== LEGACY_USERNAME) throw error;
     }
     await ensureRemoteCurrentUser();
+    try {
+      const remoteProfile = await fetchUserProfile(state.username);
+      if (remoteProfile) {
+        state.userProfile = remoteProfile;
+        await saveUserProfile(state.username, remoteProfile);
+      } else if (state.userProfile) {
+        state.userProfile = await saveUserProfileRemote(state.username, state.userProfile);
+        await saveUserProfile(state.username, state.userProfile);
+      }
+    } catch (error) {
+      console.warn("user profile sync skipped", error);
+    }
     let remoteTasks = [];
     try {
       remoteTasks = await fetchTasks(state.username);
@@ -1153,6 +1571,29 @@ async function syncFromCloud() {
     state.cloudStatus = "local";
     showMessage(`${error.message || "云端连接失败"}，正在显示缓存`);
   }
+}
+
+function normalizeBirthDateInput(value) {
+  const trimmed = String(value).trim();
+  const compact = trimmed.match(/^(\d{4})(\d{2})(\d{2})$/);
+  const match = compact ?? trimmed.match(/^(\d{4})\D+(\d{1,2})\D+(\d{1,2})\D*$/);
+  if (!match) return "";
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const date = new Date(Date.UTC(year, month - 1, day));
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) return "";
+  return `${year}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
+}
+
+function normalizeBirthTimeInput(value) {
+  if (!value) return "";
+  const match = String(value).trim().match(/^(\d{1,2})\D?(\d{2})$/);
+  if (!match) return "";
+  const hour = Number(match[1]);
+  const minute = Number(match[2]);
+  if (hour > 23 || minute > 59) return "";
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
 }
 
 window.addEventListener("online", () => { state.offline = false; syncFromCloud(); });

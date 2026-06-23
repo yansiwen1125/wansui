@@ -1,4 +1,5 @@
 import { EFFECTIVE_START_DATE, LEGACY_USERNAME, normalizeTask, normalizeTaskVersions } from "./domain.js";
+import { READING_ALGORITHM_VERSION, normalizeDailyReading } from "./reading.js";
 
 const config = window.WANSUI_CONFIG ?? {};
 const enabled = Boolean(config.supabaseUrl && config.supabasePublishableKey);
@@ -97,6 +98,101 @@ export async function saveUser(username, createdAt = new Date().toISOString()) {
     username: saved?.username ?? username,
     createdAt: saved?.created_at ?? createdAt
   };
+}
+
+export async function fetchUserProfile(username = LEGACY_USERNAME) {
+  if (!enabled) return null;
+  const rows = await request(
+    `user_profiles?username=eq.${encodeURIComponent(username)}&select=username,birth_date,birth_time,birth_city,birth_timezone,birth_time_unknown,reading_start_date,created_at,updated_at&limit=1`
+  );
+  const profile = rows?.[0];
+  if (!profile) return null;
+  return {
+    username: profile.username,
+    birthDate: profile.birth_date,
+    birthTime: profile.birth_time ?? "",
+    birthCity: profile.birth_city ?? "",
+    birthTimezone: profile.birth_timezone ?? "",
+    birthTimeUnknown: Boolean(profile.birth_time_unknown),
+    readingStartDate: profile.reading_start_date,
+    createdAt: profile.created_at,
+    updatedAt: profile.updated_at
+  };
+}
+
+export async function saveUserProfileRemote(username = LEGACY_USERNAME, profile) {
+  if (!enabled) return profile;
+  await saveUser(username);
+  const now = new Date().toISOString();
+  const payload = {
+    username,
+    birth_date: profile.birthDate,
+    birth_time: profile.birthTimeUnknown ? null : (profile.birthTime || null),
+    birth_city: profile.birthCity || null,
+    birth_timezone: profile.birthTimezone || Intl.DateTimeFormat().resolvedOptions().timeZone,
+    birth_time_unknown: Boolean(profile.birthTimeUnknown),
+    reading_start_date: profile.readingStartDate,
+    updated_at: now
+  };
+  const existing = await fetchUserProfile(username);
+  if (!existing) payload.created_at = profile.createdAt ?? now;
+  const result = await request("user_profiles?on_conflict=username", {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=representation" },
+    body: JSON.stringify(payload)
+  });
+  const saved = result?.[0];
+  return {
+    username: saved?.username ?? username,
+    birthDate: saved?.birth_date ?? profile.birthDate,
+    birthTime: saved?.birth_time ?? "",
+    birthCity: saved?.birth_city ?? "",
+    birthTimezone: saved?.birth_timezone ?? payload.birth_timezone,
+    birthTimeUnknown: Boolean(saved?.birth_time_unknown ?? profile.birthTimeUnknown),
+    readingStartDate: saved?.reading_start_date ?? profile.readingStartDate,
+    createdAt: saved?.created_at ?? profile.createdAt ?? now,
+    updatedAt: saved?.updated_at ?? now
+  };
+}
+
+export async function fetchDailyReading(username = LEGACY_USERNAME, date) {
+  if (!enabled) return null;
+  const rows = await request(
+    `daily_readings?username=eq.${encodeURIComponent(username)}&reading_date=eq.${encodeURIComponent(date)}&select=username,reading_date,fortune_score,good_tags,caution_tags,lucky_number,lucky_color,astrology_key,tarot_card_id,tarot_orientation,content,algorithm_version,created_at,updated_at&limit=1`
+  );
+  return normalizeDailyReading(rows?.[0]);
+}
+
+export async function saveDailyReadingRemote(username = LEGACY_USERNAME, reading) {
+  if (!enabled) return reading;
+  await saveUser(username);
+  const payload = {
+    username,
+    reading_date: reading.date,
+    fortune_score: reading.score,
+    good_tags: reading.goodTags ?? [],
+    caution_tags: reading.cautionTags ?? [],
+    lucky_number: reading.luckyNumber,
+    lucky_color: reading.luckyColor?.key ?? reading.luckyColor?.name ?? null,
+    astrology_key: reading.astrologyKey,
+    tarot_card_id: reading.tarot?.id,
+    tarot_orientation: reading.tarot?.orientation,
+    content: {
+      summary: reading.summary,
+      astrologyText: reading.astrologyText,
+      astrology: reading.astrology,
+      themes: reading.themes ?? [],
+      luckyColor: reading.luckyColor,
+      tarot: reading.tarot
+    },
+    algorithm_version: reading.algorithmVersion ?? READING_ALGORITHM_VERSION
+  };
+  const result = await request("daily_readings?on_conflict=username,reading_date", {
+    method: "POST",
+    headers: { Prefer: "resolution=merge-duplicates,return=representation" },
+    body: JSON.stringify(payload)
+  });
+  return normalizeDailyReading(result?.[0]) ?? reading;
 }
 
 export async function fetchTasks(username = LEGACY_USERNAME) {
