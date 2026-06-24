@@ -37,7 +37,7 @@ import {
   validateUsername,
   visibleTasks,
   weekKeys
-} from "./domain.js?v=2.0.14";
+} from "./domain.js?v=2.0.15";
 import {
   cloudEnabled,
   deleteTaskRemote,
@@ -56,8 +56,8 @@ import {
   saveUserProfileRemote,
   saveTasksRemote,
   saveUser
-} from "./api.js?v=2.0.14";
-import { READING_ALGORITHM_VERSION, generateDailyReading, normalizeDailyReading } from "./reading.js?v=2.0.14";
+} from "./api.js?v=2.0.15";
+import { READING_ALGORITHM_VERSION, generateDailyReading, normalizeDailyReading } from "./reading.js?v=2.0.15";
 import {
   currentUsername,
   ensureLegacyUser,
@@ -76,7 +76,7 @@ import {
   saveUserProfile,
   saveUsers,
   setLoggedIn
-} from "./storage.js?v=2.0.14";
+} from "./storage.js?v=2.0.15";
 
 const app = document.querySelector("#app");
 const CLOUD_SYNC_TIMEOUT_MS = 12000;
@@ -104,6 +104,7 @@ const state = {
   readingPreloading: new Set(),
   editingTaskId: "",
   confirmingDeleteTaskId: "",
+  remoteSyncing: false,
   hiddenExpanded: false,
   profileErrors: {},
   formError: ""
@@ -1027,16 +1028,6 @@ function bindEvents() {
     const defaultVersions = [createTaskVersion(todayKey(), defaultTasks)];
     await saveTasks(username, defaultTasks);
     await saveTaskVersions(username, defaultVersions);
-    if (cloudEnabled() && navigator.onLine) {
-      try {
-        await saveUser(username, createdAt);
-        await saveTaskVersionsRemote(username, defaultVersions);
-        await saveTasksRemote(username, defaultTasks);
-        state.cloudStatus = "synced";
-      } catch {
-        state.cloudStatus = "local";
-      }
-    }
     await login(username);
   });
 
@@ -1130,15 +1121,23 @@ function bindEvents() {
 async function login(username) {
   setLoggedIn(username);
   state.username = username;
+  state.tasks = [];
+  state.taskVersions = [];
+  state.records = new Map();
+  state.userProfile = null;
+  state.taskMonths = {};
+  state.saving.clear();
   state.dailyReadings.clear();
+  state.readingFailures.clear();
   state.readingPreloading.clear();
   state.readingLoading = "";
+  state.remoteSyncing = false;
   state.route = "home";
   state.loading = true;
   state.formError = "";
   state.profileErrors = {};
   render();
-  await syncFromCloud();
+  syncFromCloud();
 }
 
 async function ensureUserState() {
@@ -1557,21 +1556,37 @@ async function syncFromCloud() {
     render();
     return;
   }
-  try {
-    await withTimeout(syncRemoteState(), CLOUD_SYNC_TIMEOUT_MS, "云端同步超时");
-  } catch (error) {
-    state.cloudStatus = "local";
-    showMessage(`${error.message || "云端连接失败"}，正在显示缓存`);
-  }
+  startRemoteSync();
 }
 
-async function syncRemoteState() {
+function startRemoteSync() {
+  if (state.remoteSyncing) return;
+  const username = state.username;
+  state.remoteSyncing = true;
+  window.setTimeout(async () => {
+    try {
+      await withTimeout(syncRemoteState(username), CLOUD_SYNC_TIMEOUT_MS, "云端同步超时");
+    } catch (error) {
+      if (state.username === username) {
+        state.cloudStatus = "local";
+        showMessage(`${error.message || "云端连接失败"}，正在显示缓存`);
+      }
+    } finally {
+      if (state.username === username) state.remoteSyncing = false;
+    }
+  }, 0);
+}
+
+async function syncRemoteState(username = state.username) {
+  if (username !== state.username) return;
   await initializeCloud();
+  if (username !== state.username) return;
   try {
     await refreshUsersFromCloud();
   } catch (error) {
     if (state.username !== LEGACY_USERNAME) throw error;
   }
+  if (username !== state.username) return;
   await ensureRemoteCurrentUser();
   try {
     const remoteProfile = await fetchUserProfile(state.username);
@@ -1585,6 +1600,7 @@ async function syncRemoteState() {
   } catch (error) {
     console.warn("user profile sync skipped", error);
   }
+  if (username !== state.username) return;
   let remoteTasks = [];
   try {
     remoteTasks = await fetchTasks(state.username);
@@ -1621,12 +1637,15 @@ async function syncRemoteState() {
       if (state.username !== LEGACY_USERNAME) throw error;
     }
   }
+  if (username !== state.username) return;
   for (const task of state.tasks) {
     if (!state.taskMonths[task.id]) state.taskMonths[task.id] = startOfMonth(todayKey());
   }
   for (const item of currentUserRecords()) {
+    if (username !== state.username) return;
     await saveRecord(item.taskId, item.date, item.completed, state.username);
   }
+  if (username !== state.username) return;
   const cloud = await fetchRecords(state.username);
   if (cloud) {
     loadRecordArray(cloud);
