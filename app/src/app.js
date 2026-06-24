@@ -37,7 +37,7 @@ import {
   validateUsername,
   visibleTasks,
   weekKeys
-} from "./domain.js?v=2.0.13";
+} from "./domain.js?v=2.0.14";
 import {
   cloudEnabled,
   deleteTaskRemote,
@@ -56,8 +56,8 @@ import {
   saveUserProfileRemote,
   saveTasksRemote,
   saveUser
-} from "./api.js?v=2.0.13";
-import { READING_ALGORITHM_VERSION, generateDailyReading, normalizeDailyReading } from "./reading.js?v=2.0.13";
+} from "./api.js?v=2.0.14";
+import { READING_ALGORITHM_VERSION, generateDailyReading, normalizeDailyReading } from "./reading.js?v=2.0.14";
 import {
   currentUsername,
   ensureLegacyUser,
@@ -76,10 +76,11 @@ import {
   saveUserProfile,
   saveUsers,
   setLoggedIn
-} from "./storage.js?v=2.0.13";
+} from "./storage.js?v=2.0.14";
 
 const app = document.querySelector("#app");
 const CLOUD_SYNC_TIMEOUT_MS = 12000;
+const READING_RETRY_COOLDOWN_MS = 60000;
 const state = {
   route: isLoggedIn() ? "home" : "login",
   username: currentUsername(),
@@ -98,6 +99,7 @@ const state = {
   userProfile: null,
   tarotCards: [],
   dailyReadings: new Map(),
+  readingFailures: new Map(),
   readingLoading: "",
   readingPreloading: new Set(),
   editingTaskId: "",
@@ -296,6 +298,26 @@ function currentReading(date = state.selectedDate) {
   return null;
 }
 
+function readingFailure(date = state.selectedDate) {
+  const key = readingMapKey(state.username, date);
+  const failure = state.readingFailures.get(key) ?? null;
+  if (!failure) return null;
+  if (Date.now() - failure.at < READING_RETRY_COOLDOWN_MS) return failure;
+  state.readingFailures.delete(key);
+  return null;
+}
+
+function markReadingFailure(date, error) {
+  state.readingFailures.set(readingMapKey(state.username, date), {
+    at: Date.now(),
+    message: error?.message || "真实星盘库加载失败，请稍后重试"
+  });
+}
+
+function clearReadingFailure(date = state.selectedDate) {
+  state.readingFailures.delete(readingMapKey(state.username, date));
+}
+
 function overviewReadingLabel(date, hasProfile, today) {
   if (!canViewReadingDate(date, hasProfile ? readingStartDate() : "", today)) return "--";
   return currentReading(date)?.score ?? "—";
@@ -413,6 +435,7 @@ function renderHome() {
   const beforeStart = hasProfile && state.selectedDate < readingStartDate();
   const readable = hasProfile && canViewReadingDate(state.selectedDate, readingStartDate(), today);
   const reading = readable ? currentReading() : null;
+  const readingError = readable ? readingFailure() : null;
   if (!hasProfile) {
     app.innerHTML = `
       <main class="screen app-screen fortune-screen profile-entry-screen">
@@ -450,6 +473,12 @@ function renderHome() {
           <p>你的首页运势和塔罗会从 ${readingStartDate()} 开始生成。之前的日期不会补生成，但打卡记录仍然保留。</p>
         </section>`
         : reading ? renderReading(reading)
+        : readingError ? `<section class="fortune-loading reading-error">
+          <h2>暂时没有生成成功</h2>
+          <p>${escapeHtml(readingError.message)}</p>
+          <p>你可以先去打卡，或者稍后再试。</p>
+          <button class="primary-button" data-retry-reading>重新生成</button>
+        </section>`
         : `<section class="fortune-loading">
           <h2>正在生成</h2>
           <p>正在为今天准备运势和塔罗。</p>
@@ -834,11 +863,13 @@ function isCurrentReading(reading) {
   return reading?.algorithmVersion === READING_ALGORITHM_VERSION;
 }
 
-async function resolveDailyReading(date, { showLoading = false } = {}) {
+async function resolveDailyReading(date, { showLoading = false, force = false } = {}) {
   const key = readingMapKey(state.username, date);
   const cached = state.dailyReadings.get(key);
   if (cached && isCurrentReading(cached)) return cached;
   if (cached) state.dailyReadings.delete(key);
+  if (!force && readingFailure(date)) return null;
+  if (force) clearReadingFailure(date);
   if (state.readingLoading === date || state.readingPreloading.has(date)) return null;
   if (showLoading) state.readingLoading = date;
   state.readingPreloading.add(date);
@@ -864,6 +895,7 @@ async function resolveDailyReading(date, { showLoading = false } = {}) {
     const cards = await ensureTarotCards();
     const generated = await generateDailyReading(state.userProfile, date, cards);
     state.dailyReadings.set(key, generated);
+    clearReadingFailure(date);
     await saveDailyReading(state.username, generated);
     if (cloudEnabled() && navigator.onLine) {
       try {
@@ -877,7 +909,8 @@ async function resolveDailyReading(date, { showLoading = false } = {}) {
     }
     return generated;
   } catch (error) {
-    if (showLoading) showMessage(error.message || "真实星盘库加载失败，请稍后重试");
+    markReadingFailure(date, error);
+    if (showLoading) state.message = error.message || "真实星盘库加载失败，请稍后重试";
     return null;
   } finally {
     if (showLoading) state.readingLoading = "";
@@ -891,6 +924,7 @@ async function ensureOverviewReadings() {
   const dates = weekKeys(state.selectedDate).filter((date) => (
     canViewReadingDate(date, readingStartDate(), today)
     && !currentReading(date)
+    && !readingFailure(date)
     && !state.readingPreloading.has(date)
     && state.readingLoading !== date
   ));
@@ -907,8 +941,7 @@ async function ensureVisibleReading() {
   if (!state.userProfile) return;
   const date = state.selectedDate;
   if (!canViewReadingDate(date, readingStartDate(), todayKey())) return;
-  const key = readingMapKey(state.username, date);
-  if (!currentReading(date)) {
+  if (!currentReading(date) && !readingFailure(date)) {
     await resolveDailyReading(date, { showLoading: true });
     render();
     return;
@@ -1085,6 +1118,12 @@ function bindEvents() {
   document.querySelector("#profile-form")?.addEventListener("submit", (event) => {
     event.preventDefault();
     saveProfileForm(new FormData(event.currentTarget));
+  });
+
+  document.querySelector("[data-retry-reading]")?.addEventListener("click", async () => {
+    clearReadingFailure(state.selectedDate);
+    await resolveDailyReading(state.selectedDate, { showLoading: true, force: true });
+    render();
   });
 }
 
@@ -1397,6 +1436,10 @@ async function saveProfileForm(form) {
   state.profileErrors = {};
   state.formError = "";
   state.userProfile = profile;
+  state.dailyReadings.clear();
+  state.readingFailures.clear();
+  state.readingPreloading.clear();
+  state.readingLoading = "";
   await saveUserProfile(state.username, profile);
   try {
     if (cloudEnabled() && navigator.onLine) {

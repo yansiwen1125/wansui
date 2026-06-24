@@ -125,6 +125,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--text); outl
 .fortune-loading div { display: flex; justify-content: center; gap: 16px; margin-top: 38px; }
 .fortune-loading i { width: 10px; height: 10px; border-radius: 50%; background: var(--weak); }
 .fortune-loading i:first-child { background: var(--text); }
+.fortune-loading.reading-error { padding: 74px 18px 28px; }
+.fortune-loading.reading-error .primary-button { margin-top: 28px; }
 .profile-entry-card { margin-top: 22px; padding: 0; border: 0; border-radius: 0; background: transparent; }
 .profile-entry-screen .brand-row { margin-bottom: 72px; }
 .profile-entry-card h2 { margin: 0 0 12px; font-size: 27px; line-height: 1.1; }
