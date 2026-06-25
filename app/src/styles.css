@@ -239,14 +239,12 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--text); outl
 .register-content h1 { margin: 0; min-width: 0; font-size: clamp(28px, 8vw, 34px); line-height: 1; white-space: nowrap; align-self: center; }
 .login-content > p { color: var(--muted); margin: 12px 0 64px; }
 .register-content > p { margin-bottom: 30px; }
-#login-form { display: grid; gap: 12px; }
-#login-form label { display: grid; gap: 5px; padding: 15px 20px; background: #fff; border: 1.5px solid var(--gray); border-radius: 20px; }
-#register-form { display: grid; gap: 12px; }
-#register-form label, .task-form label { display: grid; gap: 5px; padding: 15px 20px; background: #fff; border: 1.5px solid var(--gray); border-radius: 20px; }
-#login-form label span { color: var(--weak); font-size: 12px; }
-#login-form input, #register-form input, .task-form input { border: 0; outline: 0; font-size: 18px; color: var(--text); background: transparent; }
-#login-form input::placeholder, #register-form input::placeholder, .task-form input::placeholder { color: var(--input-placeholder); opacity: 1; }
-#register-form label span, .task-form label span { color: var(--weak); font-size: 12px; }
+#login-form, #register-form, #password-setup-form, #forgot-form { display: grid; gap: 12px; }
+#login-form label, #register-form label, #password-setup-form label, #forgot-form label, .task-form label { display: grid; gap: 5px; padding: 15px 20px; background: #fff; border: 1.5px solid var(--gray); border-radius: 20px; }
+#login-form label span, #register-form label span, #password-setup-form label span, #forgot-form label span, .task-form label span { color: var(--weak); font-size: 12px; }
+#login-form input, #register-form input, #password-setup-form input, #forgot-form input, .task-form input { border: 0; outline: 0; font-size: 18px; color: var(--text); background: transparent; min-width: 0; }
+#login-form input:disabled, #register-form input:disabled, #password-setup-form input:disabled, #forgot-form input:disabled { color: var(--muted); opacity: 1; }
+#login-form input::placeholder, #register-form input::placeholder, #password-setup-form input::placeholder, #forgot-form input::placeholder, .task-form input::placeholder { color: var(--input-placeholder); opacity: 1; }
 .auth-inline { display: flex; align-items: center; justify-content: space-between; gap: 12px; min-height: 24px; }
 .auth-inline .field-error { margin: 0 4px; flex: 1; }
 .inline-text-button { border: 0; background: none; padding: 0 4px; color: var(--text); font-size: 12px; font-weight: 700; white-space: nowrap; }

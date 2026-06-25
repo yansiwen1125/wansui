@@ -37,7 +37,7 @@ import {
   validateUsername,
   visibleTasks,
   weekKeys
-} from "./domain.js?v=2.1.0";
+} from "./domain.js?v=2.1.1";
 import {
   cloudEnabled,
   deleteTaskRemote,
@@ -56,8 +56,8 @@ import {
   saveUserProfileRemote,
   saveTasksRemote,
   saveUser
-} from "./api.js?v=2.1.0";
-import { READING_ALGORITHM_VERSION, generateDailyReading, normalizeDailyReading } from "./reading.js?v=2.1.0";
+} from "./api.js?v=2.1.1";
+import { READING_ALGORITHM_VERSION, generateDailyReading, normalizeDailyReading } from "./reading.js?v=2.1.1";
 import {
   currentUsername,
   ensureLegacyUser,
@@ -76,7 +76,7 @@ import {
   saveUserProfile,
   saveUsers,
   setLoggedIn
-} from "./storage.js?v=2.1.0";
+} from "./storage.js?v=2.1.1";
 import {
   hasPasswordCredential,
   hasSecurityCredential,
@@ -88,7 +88,7 @@ import {
   verifyCredential,
   withPasswordCredential,
   withSecurityCredential
-} from "./auth.js?v=2.1.0";
+} from "./auth.js?v=2.1.1";
 
 const app = document.querySelector("#app");
 const CLOUD_SYNC_TIMEOUT_MS = 12000;
