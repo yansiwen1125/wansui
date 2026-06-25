@@ -47,6 +47,7 @@ const ASPECTS = [
 ];
 
 const ASTRONOMY_ENGINE_URL = "https://cdn.jsdelivr.net/gh/cosinekitty/astronomy@master/source/js/astronomy.browser.min.js";
+const ASTRONOMY_ENGINE_TIMEOUT_MS = 4500;
 let astronomyPromise = null;
 
 function normalizeDegree(value) {
@@ -97,18 +98,32 @@ export async function loadAstronomyEngine() {
   }
   if (!astronomyPromise) {
     astronomyPromise = new Promise((resolve, reject) => {
+      let timeoutId;
+      const fail = (message) => {
+        if (timeoutId) window.clearTimeout(timeoutId);
+        astronomyPromise = null;
+        reject(new Error(message));
+      };
       const existing = document.querySelector("script[data-astronomy-engine]");
       if (existing) {
-        existing.addEventListener("load", () => resolve(requireAstronomyApi(globalThis.Astronomy)), { once: true });
-        existing.addEventListener("error", () => reject(new Error("真实星盘库加载失败，请稍后重试")), { once: true });
+        timeoutId = window.setTimeout(() => fail("真实星盘库加载超时，已使用本地算法"), ASTRONOMY_ENGINE_TIMEOUT_MS);
+        existing.addEventListener("load", () => {
+          if (timeoutId) window.clearTimeout(timeoutId);
+          resolve(requireAstronomyApi(globalThis.Astronomy));
+        }, { once: true });
+        existing.addEventListener("error", () => fail("真实星盘库加载失败，请稍后重试"), { once: true });
         return;
       }
       const script = document.createElement("script");
       script.src = ASTRONOMY_ENGINE_URL;
       script.async = true;
       script.dataset.astronomyEngine = "true";
-      script.onload = () => resolve(requireAstronomyApi(globalThis.Astronomy));
-      script.onerror = () => reject(new Error("真实星盘库加载失败，请稍后重试"));
+      timeoutId = window.setTimeout(() => fail("真实星盘库加载超时，已使用本地算法"), ASTRONOMY_ENGINE_TIMEOUT_MS);
+      script.onload = () => {
+        if (timeoutId) window.clearTimeout(timeoutId);
+        resolve(requireAstronomyApi(globalThis.Astronomy));
+      };
+      script.onerror = () => fail("真实星盘库加载失败，请稍后重试");
       document.head.appendChild(script);
     });
   }

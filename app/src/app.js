@@ -37,7 +37,7 @@ import {
   validateUsername,
   visibleTasks,
   weekKeys
-} from "./domain.js?v=2.0.15";
+} from "./domain.js?v=2.0.16";
 import {
   cloudEnabled,
   deleteTaskRemote,
@@ -56,8 +56,8 @@ import {
   saveUserProfileRemote,
   saveTasksRemote,
   saveUser
-} from "./api.js?v=2.0.15";
-import { READING_ALGORITHM_VERSION, generateDailyReading, normalizeDailyReading } from "./reading.js?v=2.0.15";
+} from "./api.js?v=2.0.16";
+import { READING_ALGORITHM_VERSION, generateDailyReading, normalizeDailyReading } from "./reading.js?v=2.0.16";
 import {
   currentUsername,
   ensureLegacyUser,
@@ -76,7 +76,7 @@ import {
   saveUserProfile,
   saveUsers,
   setLoggedIn
-} from "./storage.js?v=2.0.15";
+} from "./storage.js?v=2.0.16";
 
 const app = document.querySelector("#app");
 const CLOUD_SYNC_TIMEOUT_MS = 12000;
@@ -1440,26 +1440,38 @@ async function saveProfileForm(form) {
   state.readingPreloading.clear();
   state.readingLoading = "";
   await saveUserProfile(state.username, profile);
-  try {
-    if (cloudEnabled() && navigator.onLine) {
-      await ensureRemoteCurrentUser();
-      state.userProfile = await saveUserProfileRemote(state.username, profile);
-      await saveUserProfile(state.username, state.userProfile);
-      state.cloudStatus = "synced";
-    } else {
-      state.cloudStatus = cloudEnabled() ? "local" : "local";
-    }
-    state.selectedDate = todayKey();
-    state.route = state.route === "profile-edit" ? "profile" : "home";
-    showMessage("已保存");
-  } catch (error) {
-    console.error("saveProfileForm failed", error);
-    state.cloudStatus = "local";
-    state.selectedDate = todayKey();
-    state.route = state.route === "profile-edit" ? "profile" : "home";
-    showMessage("已存本机，待同步");
-  }
+  state.selectedDate = todayKey();
+  state.route = state.route === "profile-edit" ? "profile" : "home";
+  state.cloudStatus = cloudEnabled() && navigator.onLine ? "syncing" : "local";
+  showMessage("已保存");
   render();
+  saveProfileRemoteInBackground(state.username, profile);
+}
+
+function saveProfileRemoteInBackground(username, profile) {
+  if (!cloudEnabled() || !navigator.onLine) return;
+  window.setTimeout(async () => {
+    if (state.username !== username) return;
+    try {
+      await withTimeout((async () => {
+        if (state.username !== username) return;
+        await ensureRemoteCurrentUser();
+        const saved = await saveUserProfileRemote(username, profile);
+        if (state.username !== username) return;
+        state.userProfile = saved;
+        await saveUserProfile(username, saved);
+        state.cloudStatus = "synced";
+        render();
+      })(), CLOUD_SYNC_TIMEOUT_MS, "云端保存超时");
+    } catch (error) {
+      console.warn("profile remote save skipped", error);
+      if (state.username === username) {
+        state.cloudStatus = "local";
+        showMessage("已存本机，稍后自动同步");
+        render();
+      }
+    }
+  }, 0);
 }
 
 async function deleteTask(taskId) {

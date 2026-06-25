@@ -1,4 +1,4 @@
-import { astrologySummary, astrologyThemes, calculateAstrology } from "./astrology.js";
+import { astrologySummary, astrologyThemes, calculateAstrology } from "./astrology.js?v=2.0.16";
 
 export const READING_ALGORITHM_VERSION = "v2.0-daily-variety";
 
@@ -78,6 +78,11 @@ const COLORS = [
   { key: "purple", name: "紫色", value: "#7B61FF" },
   { key: "deep_blue", name: "深蓝", value: "#315F8A" },
   { key: "orange", name: "橙色", value: "#FF8C42" }
+];
+
+const FALLBACK_SIGNS = [
+  "白羊", "金牛", "双子", "巨蟹", "狮子", "处女",
+  "天秤", "天蝎", "射手", "摩羯", "水瓶", "双鱼"
 ];
 
 function normalizeLuckyColor(value) {
@@ -185,6 +190,27 @@ function scoreFromAstrology(seed, themes, astrology) {
   return Math.max(48, Math.min(94, 74 + dailySwing + aspectScore + themeScore + softness));
 }
 
+function fallbackAstrology(profile, date, seed) {
+  const base = birthNumber(profile);
+  const day = fromDate(date).getDay();
+  const natal = ["sun", "moon", "mercury", "venus", "mars", "jupiter", "saturn"].map((body, index) => ({
+    body,
+    longitude: (seed + base * (index + 3) + index * 37) % 360,
+    sign: FALLBACK_SIGNS[(base + index * 2) % FALLBACK_SIGNS.length]
+  }));
+  const transit = natal.map((item, index) => ({
+    body: item.body,
+    longitude: (seed + day * 41 + index * 29) % 360,
+    sign: FALLBACK_SIGNS[(day + index * 3 + seed) % FALLBACK_SIGNS.length]
+  }));
+  return {
+    source: "local-fallback",
+    natal,
+    transit,
+    aspects: []
+  };
+}
+
 function tarotCopy(card, orientation, themes) {
   if (card?.meanings?.[orientation]) return card.meanings[orientation];
   const fallback = TAROT_FALLBACK[orientation];
@@ -225,7 +251,13 @@ export function normalizeDailyReading(row) {
 
 export async function generateDailyReading(profile, date, cards = []) {
   const seed = hashString(`${profile.username}|${profile.birthDate}|${profile.birthTime}|${profile.birthCity}|${date}|v2`);
-  const astrology = await calculateAstrology(profile, date);
+  let astrology;
+  try {
+    astrology = await calculateAstrology(profile, date);
+  } catch (error) {
+    console.warn("astrology fallback used", error);
+    astrology = fallbackAstrology(profile, date, seed);
+  }
   const themes = mixedThemes(astrology, profile, date, seed);
   const mainTheme = themes[(seed + fromDate(date).getDay()) % themes.length] ?? themes[0];
   const goodTags = unique(themes.flatMap((theme, index) => tagsFor(theme, GOOD_TAGS, seed, 2, index))).slice(0, 4);
