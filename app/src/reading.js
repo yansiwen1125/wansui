@@ -1,4 +1,4 @@
-import { astrologySummary, astrologyThemes, calculateAstrology } from "./astrology.js?v=2.0.16";
+import { astrologySummary, astrologyThemes, calculateAstrology } from "./astrology.js?v=2.1.0";
 
 export const READING_ALGORITHM_VERSION = "v2.0-daily-variety";
 

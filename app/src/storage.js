@@ -6,6 +6,7 @@ import {
   normalizeTaskVersions
 } from "./domain.js";
 import { normalizeDailyReading } from "./reading.js";
+import { normalizeUserAuth } from "./auth.js";
 
 const DB_NAME = "wansui-v1";
 const STORE = "state";
@@ -61,12 +62,12 @@ export async function saveCache(username, records) {
 
 export async function loadUsers() {
   const users = await getValue("users", null);
-  if (users?.length) return users;
-  return [{ username: LEGACY_USERNAME, createdAt: new Date().toISOString() }];
+  if (users?.length) return users.map(normalizeUserAuth).filter(Boolean);
+  return [normalizeUserAuth({ username: LEGACY_USERNAME, createdAt: new Date().toISOString() })];
 }
 
 export async function saveUsers(users) {
-  await setValue("users", users);
+  await setValue("users", users.map(normalizeUserAuth).filter(Boolean));
 }
 
 export async function ensureLegacyUser() {

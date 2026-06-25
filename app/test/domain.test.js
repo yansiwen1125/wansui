@@ -26,6 +26,14 @@ import {
 } from "../src/domain.js";
 import { calculateAstrology, zodiacSign } from "../src/astrology.js";
 import { generateDailyReading, normalizeDailyReading } from "../src/reading.js";
+import {
+  createCredential,
+  normalizeSecurityAnswer,
+  validatePasswordPair,
+  validateSecurityAnswer,
+  validateSecurityQuestion,
+  verifyCredential
+} from "../src/auth.js";
 
 globalThis.Astronomy = {
   Body: {
@@ -400,4 +408,28 @@ test("daily reading uses card-specific tarot copy", async () => {
     }
   }]);
   assert.ok(["专属关键词", "逆位关键词"].includes(reading.tarot.keywords));
+});
+
+test("password credential verifies correct password only", async () => {
+  const credential = await createCredential("secret123");
+  assert.equal(await verifyCredential("secret123", credential.hash, credential.salt), true);
+  assert.equal(await verifyCredential("wrong123", credential.hash, credential.salt), false);
+  assert.notEqual(credential.hash, "secret123");
+});
+
+test("security answer credential ignores case and surrounding spaces", async () => {
+  const credential = await createCredential("  Luna  ", normalizeSecurityAnswer);
+  assert.equal(await verifyCredential("luna", credential.hash, credential.salt, normalizeSecurityAnswer), true);
+  assert.equal(await verifyCredential("LUNA", credential.hash, credential.salt, normalizeSecurityAnswer), true);
+  assert.equal(await verifyCredential("milo", credential.hash, credential.salt, normalizeSecurityAnswer), false);
+});
+
+test("auth form validation covers password and security fields", () => {
+  assert.equal(validatePasswordPair("12345", "12345"), "密码至少 6 位");
+  assert.equal(validatePasswordPair("123456", "654321"), "两次密码不一致");
+  assert.equal(validatePasswordPair("123456", "123456"), "");
+  assert.equal(validateSecurityQuestion("猫"), "安全问题太短");
+  assert.equal(validateSecurityQuestion("我第一只宠物叫什么？"), "");
+  assert.equal(validateSecurityAnswer("A"), "安全答案太短");
+  assert.equal(validateSecurityAnswer("Luna"), "");
 });

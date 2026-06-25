@@ -1,4 +1,4 @@
-const CACHE = "wansui-v34";
+const CACHE = "wansui-v35";
 const ASSETS = [
   "./",
   "./index.html",
@@ -11,7 +11,10 @@ const ASSETS = [
   "./icons/icon-512.png",
   "./src/app.js",
   "./src/api.js",
+  "./src/auth.js",
   "./src/domain.js",
+  "./src/reading.js",
+  "./src/astrology.js",
   "./src/storage.js",
   "./src/styles.css"
 ];

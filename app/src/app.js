@@ -37,7 +37,7 @@ import {
   validateUsername,
   visibleTasks,
   weekKeys
-} from "./domain.js?v=2.0.16";
+} from "./domain.js?v=2.1.0";
 import {
   cloudEnabled,
   deleteTaskRemote,
@@ -56,8 +56,8 @@ import {
   saveUserProfileRemote,
   saveTasksRemote,
   saveUser
-} from "./api.js?v=2.0.16";
-import { READING_ALGORITHM_VERSION, generateDailyReading, normalizeDailyReading } from "./reading.js?v=2.0.16";
+} from "./api.js?v=2.1.0";
+import { READING_ALGORITHM_VERSION, generateDailyReading, normalizeDailyReading } from "./reading.js?v=2.1.0";
 import {
   currentUsername,
   ensureLegacyUser,
@@ -76,7 +76,19 @@ import {
   saveUserProfile,
   saveUsers,
   setLoggedIn
-} from "./storage.js?v=2.0.16";
+} from "./storage.js?v=2.1.0";
+import {
+  hasPasswordCredential,
+  hasSecurityCredential,
+  normalizeUserAuth,
+  normalizeSecurityAnswer,
+  validatePasswordPair,
+  validateSecurityAnswer,
+  validateSecurityQuestion,
+  verifyCredential,
+  withPasswordCredential,
+  withSecurityCredential
+} from "./auth.js?v=2.1.0";
 
 const app = document.querySelector("#app");
 const CLOUD_SYNC_TIMEOUT_MS = 12000;
@@ -106,6 +118,8 @@ const state = {
   confirmingDeleteTaskId: "",
   remoteSyncing: false,
   hiddenExpanded: false,
+  pendingUsername: "",
+  resetUser: null,
   profileErrors: {},
   formError: ""
 };
@@ -397,14 +411,16 @@ function renderLogin() {
         <p>每天看看自己，也好好过今天。</p>
         <form id="login-form">
           <label><span>用户名</span><input name="username" autocomplete="username" placeholder="请输入用户名"></label>
-        <p class="field-error" aria-live="polite">${state.formError}</p>
-        <button class="primary-button">进入万岁 <b>›</b></button>
+          <label><span>密码</span><input name="password" type="password" autocomplete="current-password" placeholder="请输入密码"></label>
+          <div class="auth-inline"><p class="field-error" aria-live="polite">${escapeHtml(state.formError)}</p><button type="button" class="inline-text-button" data-route="forgot-password">忘记密码？</button></div>
+          <button class="primary-button">进入万岁 <b>›</b></button>
         </form>
-        <button class="text-link register-link" data-route="register"><span>还没有用户名？</span><strong>去注册</strong></button>
+        <button class="text-link register-link" data-route="register"><span>还没有账号？</span><strong>去注册</strong></button>
         <aside class="login-note compact">
-          <strong>＋</strong>
-          <div><b>V2.0 · 运势与打卡</b><span>输入已注册用户名即可进入</span><span>未填写出生信息时，首页会先显示填写表单</span></div>
+          <strong>⌁</strong>
+          <div><b>V2.1 · 密码保护</b><span>输入用户名和密码即可进入</span><span>切换账号后需要重新验证</span></div>
         </aside>
+        ${state.message ? `<div class="toast">${state.message}</div>` : ""}
       </section>
     </main>`;
 }
@@ -415,16 +431,72 @@ function renderRegister() {
       <section class="login-content register-content">
         <header class="auth-title-row">
           <button class="back-button" data-route="login">${chevron("left")}</button>
-          <h1>注册用户名</h1>
+          <h1>注册账号</h1>
         </header>
-        <p>邀请码正确后，就可以拥有自己的万岁。</p>
+        <p>设置密码和安全问题，创建自己的万岁空间。</p>
         <form id="register-form">
           <label><span>用户名</span><input name="username" autocomplete="username" placeholder="2-16 个字符"></label>
+          <label><span>密码</span><input name="password" type="password" autocomplete="new-password" placeholder="至少 6 位"></label>
+          <label><span>确认密码</span><input name="confirmPassword" type="password" autocomplete="new-password" placeholder="再输入一次密码"></label>
+          <label><span>安全问题</span><input name="securityQuestion" autocomplete="off" placeholder="例如：我第一只宠物叫什么？"></label>
+          <label><span>安全答案</span><input name="securityAnswer" autocomplete="off" placeholder="请输入答案"></label>
+          <small class="auth-help">答案不会明文保存，请记住它。</small>
           <label><span>邀请码</span><input name="invite" autocomplete="off" placeholder="请输入邀请码"></label>
-          <p class="field-error" aria-live="polite">${state.formError}</p>
+          <p class="field-error" aria-live="polite">${escapeHtml(state.formError)}</p>
           <button class="primary-button">注册并进入</button>
         </form>
         <button class="text-link register-bottom-link" data-route="login"><span>已经有用户名？</span><strong>返回登录</strong></button>
+        ${state.message ? `<div class="toast">${state.message}</div>` : ""}
+      </section>
+    </main>`;
+}
+
+function renderPasswordSetup() {
+  app.innerHTML = `
+    <main class="screen login-screen">
+      <section class="login-content register-content">
+        <header class="auth-title-row">
+          <button class="back-button" data-route="login">${chevron("left")}</button>
+          <h1>设置密码</h1>
+        </header>
+        <p>为了保护你的记录，以后登录需要输入密码。<br>同时设置一个安全问题，用于忘记密码时找回。</p>
+        <form id="password-setup-form">
+          <label><span>用户名</span><input name="username" value="${escapeHtml(state.pendingUsername)}" disabled></label>
+          <label><span>密码</span><input name="password" type="password" autocomplete="new-password" placeholder="至少 6 位"></label>
+          <label><span>确认密码</span><input name="confirmPassword" type="password" autocomplete="new-password" placeholder="再输入一次密码"></label>
+          <label><span>安全问题</span><input name="securityQuestion" autocomplete="off" placeholder="例如：我第一只宠物叫什么？"></label>
+          <label><span>安全答案</span><input name="securityAnswer" autocomplete="off" placeholder="请输入答案"></label>
+          <small class="auth-help">安全答案不会明文保存，请自己记好。</small>
+          <p class="field-error" aria-live="polite">${escapeHtml(state.formError)}</p>
+          <button class="primary-button">保存并进入</button>
+        </form>
+        ${state.message ? `<div class="toast">${state.message}</div>` : ""}
+      </section>
+    </main>`;
+}
+
+function renderForgotPassword() {
+  const resetUser = state.resetUser;
+  app.innerHTML = `
+    <main class="screen login-screen">
+      <section class="login-content register-content">
+        <header class="auth-title-row">
+          <button class="back-button" data-route="login">${chevron("left")}</button>
+          <h1>找回密码</h1>
+        </header>
+        <p>输入用户名，回答安全问题后重新设置密码。</p>
+        <form id="forgot-form">
+          <label><span>用户名</span><input name="username" autocomplete="username" value="${escapeHtml(resetUser?.username ?? "")}" placeholder="请输入用户名"></label>
+          ${resetUser ? `<aside class="security-question"><small>安全问题</small><strong>${escapeHtml(resetUser.securityQuestion)}</strong></aside>` : ""}
+          ${resetUser ? `
+            <label><span>安全答案</span><input name="securityAnswer" autocomplete="off" placeholder="请输入答案"></label>
+            <label><span>新密码</span><input name="password" type="password" autocomplete="new-password" placeholder="至少 6 位"></label>
+            <label><span>确认新密码</span><input name="confirmPassword" type="password" autocomplete="new-password" placeholder="再输入一次密码"></label>
+          ` : ""}
+          <p class="field-error" aria-live="polite">${escapeHtml(state.formError)}</p>
+          <button class="primary-button">${resetUser ? "重设密码" : "查看安全问题"}</button>
+        </form>
+        ${state.message ? `<div class="toast">${state.message}</div>` : ""}
       </section>
     </main>`;
 }
@@ -789,12 +861,14 @@ function escapeHtml(value) {
 }
 
 function render() {
-  if (state.loading && state.route !== "login" && state.route !== "register") {
+  if (state.loading && !["login", "register", "password-setup", "forgot-password"].includes(state.route)) {
     app.innerHTML = `<main class="screen loading-screen"><i class="spinner"></i></main>`;
     return;
   }
   if (state.route === "login") renderLogin();
   else if (state.route === "register") renderRegister();
+  else if (state.route === "password-setup") renderPasswordSetup();
+  else if (state.route === "forgot-password") renderForgotPassword();
   else if (state.route === "home") renderHome();
   else if (state.route === "checkin") renderCheckin();
   else if (state.route === "profile") renderProfile();
@@ -810,10 +884,20 @@ function render() {
 function mergeUsers(localUsers, remoteUsers) {
   const merged = new Map();
   [...localUsers, ...remoteUsers].forEach((user) => {
-    if (!user?.username) return;
-    merged.set(user.username, {
-      username: user.username,
-      createdAt: user.createdAt ?? new Date().toISOString()
+    const normalized = normalizeUserAuth(user);
+    if (!normalized?.username) return;
+    const existing = merged.get(normalized.username);
+    merged.set(normalized.username, {
+      ...existing,
+      ...normalized,
+      createdAt: existing?.createdAt && existing.createdAt < normalized.createdAt ? existing.createdAt : normalized.createdAt,
+      passwordHash: normalized.passwordHash || existing?.passwordHash || "",
+      passwordSalt: normalized.passwordSalt || existing?.passwordSalt || "",
+      passwordUpdatedAt: normalized.passwordUpdatedAt || existing?.passwordUpdatedAt || "",
+      securityQuestion: normalized.securityQuestion || existing?.securityQuestion || "",
+      securityAnswerHash: normalized.securityAnswerHash || existing?.securityAnswerHash || "",
+      securityAnswerSalt: normalized.securityAnswerSalt || existing?.securityAnswerSalt || "",
+      securityAnswerUpdatedAt: normalized.securityAnswerUpdatedAt || existing?.securityAnswerUpdatedAt || ""
     });
   });
   return [...merged.values()].sort((a, b) => a.createdAt.localeCompare(b.createdAt));
@@ -829,12 +913,33 @@ async function refreshUsersFromCloud() {
   return merged;
 }
 
+async function upsertLocalUser(user) {
+  const users = await loadUsers();
+  const normalized = normalizeUserAuth(user);
+  const next = mergeUsers(users, [normalized]);
+  await saveUsers(next);
+  state.users = next;
+  return normalized;
+}
+
+function saveUserRemoteInBackground(user) {
+  if (!cloudEnabled() || !navigator.onLine) return;
+  const normalized = normalizeUserAuth(user);
+  window.setTimeout(async () => {
+    try {
+      const saved = await withTimeout(saveUser(normalized), CLOUD_SYNC_TIMEOUT_MS, "云端保存超时");
+      await upsertLocalUser(saved);
+    } catch (error) {
+      console.warn("user remote save skipped", error);
+    }
+  }, 0);
+}
+
 async function ensureRemoteCurrentUser(users = state.users) {
   if (!cloudEnabled() || !navigator.onLine || !state.username) return users;
   const localUsers = users?.length ? users : await loadUsers();
   const existing = localUsers.find((user) => user.username === state.username);
-  const createdAt = existing?.createdAt ?? new Date().toISOString();
-  const savedUser = await saveUser(state.username, createdAt);
+  const savedUser = await saveUser(existing ?? { username: state.username, createdAt: new Date().toISOString() });
   const merged = mergeUsers(localUsers, [savedUser]);
   await saveUsers(merged);
   state.users = merged;
@@ -956,6 +1061,8 @@ function bindEvents() {
       state.formError = "";
       state.profileErrors = {};
       state.route = button.dataset.route;
+      if (state.route !== "password-setup") state.pendingUsername = "";
+      if (state.route !== "forgot-password") state.resetUser = null;
       if (state.route === "tasks") state.hiddenExpanded = false;
       render();
     });
@@ -971,13 +1078,17 @@ function bindEvents() {
     state.route = "login";
     state.formError = "";
     state.profileErrors = {};
+    state.pendingUsername = "";
+    state.resetUser = null;
     state.loading = false;
     render();
   });
 
   document.querySelector("#login-form")?.addEventListener("submit", async (event) => {
     event.preventDefault();
-    const username = normalizeUsername(new FormData(event.currentTarget).get("username"));
+    const form = new FormData(event.currentTarget);
+    const username = normalizeUsername(form.get("username"));
+    const password = String(form.get("password") ?? "");
     const error = validateUsername(username);
     if (error) {
       state.formError = error;
@@ -985,14 +1096,34 @@ function bindEvents() {
       return;
     }
     let users = await loadUsers();
-    if (!users.some((user) => user.username === username) && cloudEnabled() && navigator.onLine) {
+    let user = users.find((item) => item.username === username);
+    if ((!user || !hasPasswordCredential(user)) && cloudEnabled() && navigator.onLine) {
       try {
         users = await refreshUsersFromCloud();
+        user = users.find((item) => item.username === username);
       } catch {}
     }
-    if (!users.some((user) => user.username === username)) {
+    if (!user) {
       state.route = "register";
       state.formError = "这个用户名还没有注册";
+      render();
+      return;
+    }
+    if (!hasPasswordCredential(user)) {
+      state.pendingUsername = username;
+      state.route = "password-setup";
+      state.formError = "";
+      render();
+      return;
+    }
+    if (!String(password).trim()) {
+      state.formError = "请输入密码";
+      render();
+      return;
+    }
+    const verified = await verifyCredential(password, user.passwordHash, user.passwordSalt);
+    if (!verified) {
+      state.formError = "用户名或密码不正确";
       render();
       return;
     }
@@ -1003,10 +1134,32 @@ function bindEvents() {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
     const username = normalizeUsername(form.get("username"));
+    const password = String(form.get("password") ?? "");
+    const confirmPassword = String(form.get("confirmPassword") ?? "");
+    const securityQuestion = String(form.get("securityQuestion") ?? "").trim();
+    const securityAnswer = String(form.get("securityAnswer") ?? "").trim();
     const invite = String(form.get("invite") ?? "").trim();
     const error = validateUsername(username);
     if (error) {
       state.formError = error;
+      render();
+      return;
+    }
+    const passwordError = validatePasswordPair(password, confirmPassword);
+    if (passwordError) {
+      state.formError = passwordError;
+      render();
+      return;
+    }
+    const questionError = validateSecurityQuestion(securityQuestion);
+    if (questionError) {
+      state.formError = questionError;
+      render();
+      return;
+    }
+    const answerError = validateSecurityAnswer(securityAnswer);
+    if (answerError) {
+      state.formError = answerError;
       render();
       return;
     }
@@ -1022,13 +1175,131 @@ function bindEvents() {
       return;
     }
     const createdAt = new Date().toISOString();
-    users.push({ username, createdAt });
+    let user = normalizeUserAuth({ username, createdAt });
+    user = await withPasswordCredential(user, password);
+    user = await withSecurityCredential(user, securityQuestion, securityAnswer);
+    users.push(user);
     await saveUsers(users);
+    saveUserRemoteInBackground(user);
     const defaultTasks = createDefaultTasks(todayKey());
     const defaultVersions = [createTaskVersion(todayKey(), defaultTasks)];
     await saveTasks(username, defaultTasks);
     await saveTaskVersions(username, defaultVersions);
     await login(username);
+  });
+
+  document.querySelector("#password-setup-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const username = state.pendingUsername;
+    const password = String(form.get("password") ?? "");
+    const confirmPassword = String(form.get("confirmPassword") ?? "");
+    const securityQuestion = String(form.get("securityQuestion") ?? "").trim();
+    const securityAnswer = String(form.get("securityAnswer") ?? "").trim();
+    const passwordError = validatePasswordPair(password, confirmPassword);
+    if (passwordError) {
+      state.formError = passwordError;
+      render();
+      return;
+    }
+    const questionError = validateSecurityQuestion(securityQuestion);
+    if (questionError) {
+      state.formError = questionError;
+      render();
+      return;
+    }
+    const answerError = validateSecurityAnswer(securityAnswer);
+    if (answerError) {
+      state.formError = answerError;
+      render();
+      return;
+    }
+    const users = await loadUsers();
+    const existing = users.find((user) => user.username === username);
+    if (!existing) {
+      state.route = "login";
+      state.formError = "请重新输入用户名";
+      render();
+      return;
+    }
+    let updated = await withPasswordCredential(existing, password);
+    updated = await withSecurityCredential(updated, securityQuestion, securityAnswer);
+    await upsertLocalUser(updated);
+    saveUserRemoteInBackground(updated);
+    state.pendingUsername = "";
+    await login(username);
+  });
+
+  document.querySelector("#forgot-form")?.addEventListener("submit", async (event) => {
+    event.preventDefault();
+    const form = new FormData(event.currentTarget);
+    const username = normalizeUsername(form.get("username"));
+    const error = validateUsername(username);
+    if (error) {
+      state.formError = error;
+      render();
+      return;
+    }
+    let users = await loadUsers();
+    let user = users.find((item) => item.username === username);
+    if ((!user || !hasSecurityCredential(user)) && cloudEnabled() && navigator.onLine) {
+      try {
+        users = await refreshUsersFromCloud();
+        user = users.find((item) => item.username === username);
+      } catch {}
+    }
+    if (!user || !hasPasswordCredential(user)) {
+      state.formError = "用户名或安全答案不正确";
+      state.resetUser = null;
+      render();
+      return;
+    }
+    if (!hasSecurityCredential(user)) {
+      state.formError = "这个账号还没有设置安全问题，请联系管理员处理";
+      state.resetUser = null;
+      render();
+      return;
+    }
+    if (!state.resetUser || state.resetUser.username !== username) {
+      state.resetUser = user;
+      state.formError = "";
+      render();
+      return;
+    }
+    const securityAnswer = String(form.get("securityAnswer") ?? "");
+    const password = String(form.get("password") ?? "");
+    const confirmPassword = String(form.get("confirmPassword") ?? "");
+    const answerError = validateSecurityAnswer(securityAnswer);
+    if (answerError) {
+      state.formError = answerError;
+      render();
+      return;
+    }
+    const answerVerified = await verifyCredential(
+      securityAnswer,
+      user.securityAnswerHash,
+      user.securityAnswerSalt,
+      normalizeSecurityAnswer
+    );
+    if (!answerVerified) {
+      state.formError = "用户名或安全答案不正确";
+      render();
+      return;
+    }
+    const passwordError = validatePasswordPair(password, confirmPassword);
+    if (passwordError) {
+      state.formError = passwordError;
+      render();
+      return;
+    }
+    const updated = await withPasswordCredential(user, password);
+    await upsertLocalUser(updated);
+    saveUserRemoteInBackground(updated);
+    state.route = "login";
+    state.resetUser = null;
+    state.formError = "";
+    showMessage("密码已重设，请重新登录");
+    render();
   });
 
   document.querySelectorAll("[data-date-step]").forEach((button) => {
@@ -1145,6 +1416,19 @@ async function ensureUserState() {
   state.users = await loadUsers();
   if (!state.username && isLoggedIn()) state.username = currentUsername();
   if (!state.username) return;
+  let currentUser = state.users.find((user) => user.username === state.username);
+  if ((!currentUser || !hasPasswordCredential(currentUser)) && cloudEnabled() && navigator.onLine) {
+    try {
+      state.users = await refreshUsersFromCloud();
+      currentUser = state.users.find((user) => user.username === state.username);
+    } catch {}
+  }
+  if (currentUser && !hasPasswordCredential(currentUser)) {
+    state.pendingUsername = state.username;
+    state.route = "password-setup";
+    state.loading = false;
+    return;
+  }
   state.userProfile = await loadUserProfile(state.username);
   state.tasks = await loadTasks(state.username);
   if (!state.tasks.length) {

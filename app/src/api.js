@@ -1,5 +1,6 @@
 import { EFFECTIVE_START_DATE, LEGACY_USERNAME, normalizeTask, normalizeTaskVersions } from "./domain.js";
 import { READING_ALGORITHM_VERSION, normalizeDailyReading } from "./reading.js";
+import { normalizeUserAuth } from "./auth.js";
 
 const config = window.WANSUI_CONFIG ?? {};
 const enabled = Boolean(config.supabaseUrl && config.supabasePublishableKey);
@@ -68,36 +69,42 @@ export async function initializeCloud() {
 
 export async function fetchUsers() {
   if (!enabled) return [];
-  const users = await request("users?select=username,created_at&order=created_at.asc");
-  return (users ?? []).map((user) => ({
-    username: user.username,
-    createdAt: user.created_at ?? new Date().toISOString()
-  }));
+  const users = await request("users?select=username,created_at,password_hash,password_salt,password_updated_at,security_question,security_answer_hash,security_answer_salt,security_answer_updated_at&order=created_at.asc")
+    .catch(() => request("users?select=username,created_at&order=created_at.asc"));
+  return (users ?? []).map(normalizeUserAuth).filter(Boolean);
 }
 
-export async function saveUser(username, createdAt = new Date().toISOString()) {
-  if (!enabled) return { username, createdAt };
-  const existing = await request(`users?username=eq.${encodeURIComponent(username)}&select=username,created_at`);
-  if (existing.length) {
-    return {
-      username: existing[0].username,
-      createdAt: existing[0].created_at ?? createdAt
-    };
-  }
-  const result = await request("users", {
+export async function saveUser(userOrUsername, createdAt = new Date().toISOString()) {
+  const user = normalizeUserAuth(typeof userOrUsername === "string" ? { username: userOrUsername, createdAt } : userOrUsername);
+  if (!enabled) return user;
+  const payload = {
+    username: user.username,
+    created_at: user.createdAt ?? createdAt,
+    password_hash: user.passwordHash || null,
+    password_salt: user.passwordSalt || null,
+    password_updated_at: user.passwordUpdatedAt || null,
+    security_question: user.securityQuestion || null,
+    security_answer_hash: user.securityAnswerHash || null,
+    security_answer_salt: user.securityAnswerSalt || null,
+    security_answer_updated_at: user.securityAnswerUpdatedAt || null
+  };
+  const result = await request("users?on_conflict=username", {
     method: "POST",
-    headers: { Prefer: "return=representation" },
-    body: JSON.stringify({ username, created_at: createdAt })
+    headers: { Prefer: "resolution=merge-duplicates,return=representation" },
+    body: JSON.stringify(payload)
   }).catch(async (error) => {
-    const retry = await request(`users?username=eq.${encodeURIComponent(username)}&select=username,created_at`);
+    const retryPayload = { username: user.username, created_at: user.createdAt ?? createdAt };
+    await request("users?on_conflict=username", {
+      method: "POST",
+      headers: { Prefer: "resolution=merge-duplicates" },
+      body: JSON.stringify(retryPayload)
+    }).catch(() => null);
+    const retry = await request("users?select=username,created_at,password_hash,password_salt,password_updated_at,security_question,security_answer_hash,security_answer_salt,security_answer_updated_at&username=eq." + encodeURIComponent(user.username))
+      .catch(() => request("users?select=username,created_at&username=eq." + encodeURIComponent(user.username)));
     if (retry.length) return retry;
     throw error;
   });
-  const saved = result?.[0];
-  return {
-    username: saved?.username ?? username,
-    createdAt: saved?.created_at ?? createdAt
-  };
+  return normalizeUserAuth(result?.[0]) ?? user;
 }
 
 export async function fetchUserProfile(username = LEGACY_USERNAME) {
